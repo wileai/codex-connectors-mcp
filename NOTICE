@@ -1,0 +1,4 @@
+The app-server transport and connector discovery implementation are adapted from
+the user's pi-codex-connectors repository, revision
+0e9709ea1e31a6e8b8b1435d8f084b516dec23a1.
+This project does not depend on Pi at runtime.

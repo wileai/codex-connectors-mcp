@@ -1,0 +1,20 @@
+# Live scenarios
+
+- Direct stdio: complete catalog; unique portable names; original schema lookup;
+  real GitHub profile through direct and dispatcher calls; Figma draft-2020 input;
+  invalid arguments; unknown tools; write denial; refresh notification and stable
+  names; old/new app-server process cleanup.
+- Compact stdio: three tools; allowlisted discovery; pagination; real profile;
+  clients without elicitation cannot write; excluded tools cannot be called.
+- Approval: real MCP elicitation reaches the client; decline blocks the operation.
+- Empty allowlist: no connector metadata/tools exposed; excluded calls rejected.
+- HTTP: missing credentials and foreign Origin rejected; unknown sessions rejected;
+  independent authenticated sessions; real reads; DELETE removes one session without
+  affecting the other; all app-server processes exit on session cleanup.
+- Lifecycle: missing executable; cancellation before dispatch; SIGKILL and recovery
+  with a real profile read; closed-service rejection; timeout after dispatch of a
+  harmless read reports an unknown outcome.
+
+These scenarios require the current Codex login and network access. They do not
+simulate a provider or exercise successful remote mutations. No profile payloads
+or account-specific schemas are saved in the repository.

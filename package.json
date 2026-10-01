@@ -1,0 +1,34 @@
+{
+  "name": "codex-connectors-mcp",
+  "version": "0.1.0",
+  "description": "Expose connected Codex apps to MCP harnesses without running a model",
+  "type": "module",
+  "bin": {
+    "codex-connectors-mcp": "dist/cli.js"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "build": "tsc",
+    "check": "tsc --noEmit",
+    "start": "node dist/cli.js",
+    "test": "npm run build && node --test --test-concurrency=1 integration/*.test.mjs",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.31.0",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0"
+  }
+}
