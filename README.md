@@ -24,7 +24,6 @@ Add this to your harness's MCP configuration (no clone or build required):
       "command": "npx",
       "args": ["-y", "codex-connectors-mcp@latest"],
       "env": {
-        "CODEX_CONNECTORS_WRITES": "ask",
         "CODEX_CONNECTORS_ALLOW": "GitHub"
       }
     }
@@ -46,7 +45,6 @@ startup_timeout_sec = 120
 tool_timeout_sec = 180
 
 [mcp_servers.codex-connectors.env]
-CODEX_CONNECTORS_WRITES = "ask"
 CODEX_CONNECTORS_ALLOW = "GitHub"
 ```
 
