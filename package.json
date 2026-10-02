@@ -11,7 +11,8 @@
     "dist/*.d.ts",
     "README.md",
     "NOTICE",
-    "LICENSE"
+    "LICENSE",
+    "RELEASING.md"
   ],
   "engines": {
     "node": ">=22.19"
@@ -21,7 +22,8 @@
     "check": "tsc --noEmit",
     "start": "node dist/cli.js",
     "test": "npm run build && node --test --test-concurrency=1 integration/*.test.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:package": "npm run build && node scripts/verify-package.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.31.0",
@@ -34,5 +36,24 @@
     "typescript": "^5.9.0"
   },
   "license": "MIT",
-  "author": "Wile <info@wile.ai>"
+  "author": "Wile <info@wile.ai>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wileai/codex-connectors-mcp.git"
+  },
+  "homepage": "https://github.com/wileai/codex-connectors-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/wileai/codex-connectors-mcp/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "keywords": [
+    "mcp",
+    "codex",
+    "connectors",
+    "stdio",
+    "ai"
+  ]
 }

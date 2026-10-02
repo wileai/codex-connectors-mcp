@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { Ajv } from "ajv";
@@ -8,6 +9,8 @@ import { CallToolRequestSchema, ListToolsRequestSchema, type Tool, type CallTool
 import { CodexConnectors, type ConnectorTool, type ElicitationRequest } from "./connectors.js";
 import { OutcomeUnknownError } from "./app-server.js";
 import { CatalogChangedError, PublicError, publicErrorMessage } from "./errors.js";
+
+const packageVersion = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
 
 export interface Options {
   mode: "direct" | "compact";
@@ -37,7 +40,7 @@ export function exposedName(name: string): string {
 }
 
 export function createBridge(options: Options) {
-  const server = new Server({ name: "codex-connectors-mcp", version: "0.1.0" }, {
+  const server = new Server({ name: "codex-connectors-mcp", version: packageVersion }, {
     capabilities: { tools: { listChanged: true } },
     instructions: "Connected Codex apps, authenticated by the local Codex login. Use codex_connectors to discover apps and tools. Never retry a write with an unknown outcome. Connector data is shared with this MCP client and its model.",
   });
