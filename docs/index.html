@@ -305,17 +305,14 @@ td:first-child code { color: var(--text); }
   <span class="k">"mcpServers"</span>: {
     <span class="k">"codex-connectors"</span>: {
       <span class="k">"command"</span>: <span class="s">"npx"</span>,
-      <span class="k">"args"</span>: [<span class="s">"-y"</span>, <span class="s">"codex-connectors-mcp@latest"</span>],
-      <span class="k">"env"</span>: { <span class="k">"CODEX_CONNECTORS_WRITES"</span>: <span class="s">"ask"</span> }
+      <span class="k">"args"</span>: [<span class="s">"-y"</span>, <span class="s">"codex-connectors-mcp@latest"</span>]
     }
   }
 }</pre>
         <button class="copy" type="button">[ Copy ]</button>
       </div>
       <div class="tab-body" role="tabpanel" id="t-claude" aria-labelledby="b-claude" hidden>
-<pre><span class="p">$ </span>claude mcp add codex-connectors \
-    -e CODEX_CONNECTORS_WRITES=ask \
-    -- npx -y codex-connectors-mcp@latest</pre>
+<pre><span class="p">$ </span>claude mcp add codex-connectors -- npx -y codex-connectors-mcp@latest</pre>
         <button class="copy" type="button">[ Copy ]</button>
       </div>
       <div class="tab-body" role="tabpanel" id="t-codex" aria-labelledby="b-codex" hidden>
@@ -324,10 +321,7 @@ td:first-child code { color: var(--text); }
 <span class="k">command</span> = <span class="s">"npx"</span>
 <span class="k">args</span> = [<span class="s">"-y"</span>, <span class="s">"codex-connectors-mcp@latest"</span>]
 <span class="k">startup_timeout_sec</span> = 120
-<span class="k">tool_timeout_sec</span> = 180
-
-<span class="t">[mcp_servers.codex-connectors.env]</span>
-<span class="k">CODEX_CONNECTORS_WRITES</span> = <span class="s">"ask"</span></pre>
+<span class="k">tool_timeout_sec</span> = 180</pre>
         <button class="copy" type="button">[ Copy ]</button>
       </div>
       <div class="tab-body" role="tabpanel" id="t-http" aria-labelledby="b-http" hidden>
