@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>codex-connectors-mcp</title>
+<meta name="description" content="Use any Codex plugin from any agent harness. An MCP bridge that exposes your connected Codex apps over stdio or Streamable HTTP — no model turn, no API key.">
+<meta property="og:title" content="codex-connectors-mcp — Codex plugins, in any harness">
+<meta property="og:description" content="Use any Codex plugin from any harness that speaks MCP. Codex owns authentication; your harness chooses the model.">
+<meta property="og:image" content="https://wileai.github.io/codex-connectors-mcp/assets/codex-plugins.webp">
+<meta name="theme-color" content="#0d1116">
+<link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..600&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: dark;
+  --terracotta: #b86b52;
+  --terracotta-soft: #e3a08a;
+  --sunkissed: #e1b06e;
+  --sage: #a3a473;
+  --accent: #6a9fcc;
+  --thread-blue: #4b607c;
+  --bg-deep: #0d1116;
+  --bg-canvas: #161d27;
+  --panel: #212730e6;
+  --panel-soft: #252f3dd1;
+  --line: #49505980;
+  --line-strong: #757d8975;
+  --text: #ebe7e4;
+  --copy: #ebe7e4bf;
+  --muted: #9fa4abad;
+  --muted-strong: #d5d8dbcc;
+  --serif: "Newsreader", "Plantin MT Pro", Georgia, serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --grid-minor: hsl(218 60% 80% / 0.012);
+  --grid-major: hsl(218 60% 80% / 0.03);
+  --stripe: linear-gradient(90deg, var(--accent) 0 62%, var(--thread-blue) 62% 100%);
+  --stripe-v: linear-gradient(180deg, var(--accent) 0 62%, var(--thread-blue) 62% 100%);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; scroll-padding-top: 6rem; }
+body {
+  background-color: var(--bg-deep);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, #1f2a3a 0%, transparent 70%),
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid-minor) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-minor) 1px, transparent 1px);
+  background-size: 100% 100%, 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  color: var(--copy);
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+::selection { background: #6a9fcc3d; }
+a { color: var(--accent); text-decoration: underline; text-decoration-color: #6a9fcc38; text-underline-offset: 3px; }
+a:hover { text-decoration-color: var(--accent); }
+img { display: block; max-width: 100%; }
+code, pre, kbd { font-family: var(--mono); }
+p code, li code, td code {
+  font-size: 0.82em; padding: 0.08em 0.4em; border: 1px solid var(--line);
+  background: #ffffff06; color: var(--muted-strong); border-radius: 2px;
+}
+.wrap { width: min(1080px, 100% - 32px); margin-inline: auto; }
+
+/* Announcement + nav */
+.announce {
+  text-align: center; padding: 0.55rem 1rem; font-style: italic; font-size: 1rem;
+  color: var(--muted-strong); background: #212730; border-bottom: 1px solid var(--line);
+}
+.nav {
+  position: sticky; top: 0.75rem; z-index: 10; margin-top: 0.75rem;
+  display: flex; align-items: center; gap: 1rem; justify-content: space-between;
+  padding: 0.75rem 1.25rem; border: 1px solid #495059bd;
+  background: linear-gradient(180deg, #212730f7, #0d1116e8), linear-gradient(90deg, #4b607c24, #2f5f8a14);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px #0006, inset 0 1px 0 #9fa4ab30;
+}
+.nav .brand { display: flex; align-items: center; gap: 0.6rem; color: var(--text); text-decoration: none;
+  font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.08em; }
+.nav .brand svg { width: 26px; height: auto; }
+.nav ul { display: flex; gap: 1.25rem; list-style: none; flex-wrap: wrap; justify-content: flex-end; }
+.nav ul a { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: #d5d8dbad; text-decoration: none; }
+.nav ul a:hover { color: var(--text); }
+
+/* Hero */
+.hero { text-align: center; padding: 5.5rem 0 3.5rem; }
+.hero .mark { width: 88px; margin: 0 auto 2.5rem; }
+h1 {
+  font-weight: 350; font-style: italic; color: var(--text);
+  font-size: clamp(2.3rem, 5.4vw, 3.6rem); line-height: 1.08; letter-spacing: -0.01em;
+}
+h1 em, h2 em { color: var(--accent); }
+.lede { margin: 1.75rem auto 0; max-width: 34rem; font-size: 1.15rem; color: var(--copy); }
+
+/* Terminal panel */
+.panel {
+  border: 1px solid var(--line); background: var(--panel); text-align: left;
+  box-shadow: 0 18px 50px #00000059;
+}
+.panel-bar {
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 1rem;
+  border-bottom: 1px solid var(--line); background: #ffffff05;
+  font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted-strong);
+  position: relative;
+}
+.panel-bar::before { content: ""; position: absolute; left: -1px; top: -1px; bottom: -1px; width: 3px; background: var(--stripe-v); }
+.panel-bar .dot { width: 6px; height: 6px; background: var(--accent); display: inline-block; }
+
+.install { max-width: 760px; margin: 3rem auto 0; }
+.tabs { display: flex; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.tabs button {
+  font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--muted); padding: 0.85rem 1.2rem; border: 0; border-right: 1px solid var(--line);
+  background: none; cursor: pointer; position: relative; white-space: nowrap;
+}
+.tabs button:hover { color: var(--text); background: #ffffff05; }
+.tabs button[aria-selected="true"] { color: var(--text); }
+.tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--stripe); }
+.tab-body { position: relative; padding: 1.4rem 1.4rem; }
+.tab-body pre { margin: 0; padding-right: 6rem; }
+.copy {
+  position: absolute; top: 1.1rem; right: 1.1rem;
+  font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--muted-strong); background: #ffffff04; border: 1px solid var(--line-strong);
+  padding: 0.5rem 0.8rem; cursor: pointer;
+}
+.copy:hover { border-color: #6a9fcc85; color: var(--text); }
+.copy.done { border-color: #6a9fccad; color: var(--accent); }
+pre {
+  font-size: 0.82rem; line-height: 1.7; color: var(--muted-strong);
+  overflow-x: auto; white-space: pre; tab-size: 2;
+}
+pre .p { color: var(--muted); user-select: none; }
+pre .k { color: var(--accent); }
+pre .s { color: var(--sunkissed); }
+pre .c { color: #9fa4ab80; }
+pre .t { color: var(--terracotta-soft); }
+.hint { margin-top: 1rem; font-size: 0.95rem; color: var(--muted); text-align: center; font-style: italic; }
+
+/* Sections */
+section { padding: 5.5rem 0 1rem; }
+.label {
+  font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--muted); display: inline-flex; align-items: center; gap: 0.6rem; margin-bottom: 1.1rem;
+}
+.label::before { content: ""; width: 18px; height: 2px; background: var(--stripe); }
+h2 {
+  font-weight: 350; color: var(--text); font-size: clamp(1.9rem, 4vw, 2.55rem);
+  line-height: 1.12; letter-spacing: -0.005em; margin-bottom: 1.25rem;
+}
+h3 { font-weight: 450; color: var(--text); font-size: 1.45rem; line-height: 1.2; margin-bottom: 0.5rem; }
+.prose p { margin-bottom: 1rem; max-width: 40rem; }
+.prose p strong, .split strong { color: var(--text); font-weight: 500; }
+
+.split { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 3rem; align-items: start; }
+.split.flip { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+
+/* Showcase */
+.showcase { display: grid; gap: 2.5rem; }
+.shot { position: relative; }
+.shot img { width: 100%; height: auto; }
+.shot figcaption {
+  font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.08em; color: var(--muted);
+  padding: 0.75rem 1rem; border-top: 1px solid var(--line);
+}
+.callout {
+  border-left: 3px solid; border-image: var(--stripe-v) 1;
+  padding: 0.25rem 0 0.25rem 1.5rem; font-size: 1.3rem; font-style: italic; color: var(--text); max-width: 46rem;
+}
+.callout span { color: var(--accent); }
+.harnesses { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.5rem; }
+.chip {
+  font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; color: var(--muted-strong);
+  border: 1px solid var(--line-strong); padding: 0.35rem 0.7rem; background: #ffffff04;
+}
+.chip.on { border-color: #6a9fcc66; color: var(--text); background: #6a9fcc13; }
+
+/* Flow diagram */
+.flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; margin-top: 2rem; align-items: stretch; }
+.node {
+  border: 1px solid var(--line); background: var(--panel-soft); padding: 1rem; position: relative;
+}
+.node + .node { border-left: 0; }
+.node .tag { font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.node .name { color: var(--text); font-size: 1.05rem; margin-top: 0.35rem; line-height: 1.25; }
+.node .sub { font-size: 0.85rem; color: var(--muted); margin-top: 0.35rem; line-height: 1.4; }
+.node.hl { background: #1e2a3a; border-color: #6a9fcc66; box-shadow: inset 0 2px 0 var(--accent); }
+.node.hl + .node { border-left: 1px solid #6a9fcc66; }
+.node::after {
+  content: "→"; position: absolute; right: -0.7rem; top: 50%; transform: translateY(-50%);
+  width: 1.4rem; height: 1.4rem; display: grid; place-items: center;
+  font-family: var(--mono); font-size: 0.75rem; color: var(--sunkissed); background: var(--bg-deep);
+  border: 1px solid var(--line-strong); z-index: 1; line-height: 1;
+}
+.node:last-child::after { display: none; }
+.wire { font-family: var(--mono); font-size: 0.68rem; color: var(--muted); margin-top: 0.75rem; letter-spacing: 0.04em; }
+
+ol.steps { list-style: none; counter-reset: s; margin-top: 2rem; display: grid; gap: 0.1rem; }
+ol.steps li {
+  counter-increment: s; display: grid; grid-template-columns: 3rem 1fr; gap: 0.5rem;
+  padding: 0.8rem 0; border-top: 1px solid var(--line);
+}
+ol.steps li::before { content: counter(s, decimal-leading-zero); font-family: var(--mono); font-size: 0.75rem; color: var(--sunkissed); padding-top: 0.25rem; }
+
+/* Cards */
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); margin-top: 2rem; }
+.card { background: var(--bg-canvas); padding: 1.5rem; }
+.card .tag { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--sunkissed); margin-bottom: 0.75rem; }
+.card p { font-size: 0.98rem; }
+.card.def .tag { color: var(--accent); }
+
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 2rem; }
+.modes .panel .body { padding: 1.25rem 1.4rem; }
+.modes .panel p { font-size: 0.98rem; margin-bottom: 1rem; }
+
+/* Table */
+.table-wrap { overflow-x: auto; margin-top: 2rem; border: 1px solid var(--line); }
+table { width: 100%; border-collapse: collapse; font-size: 0.95rem; min-width: 560px; }
+th, td { text-align: left; padding: 0.8rem 1rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.16em; text-transform: uppercase; font-weight: 400; color: var(--muted); background: #ffffff0b; }
+tr:last-child td { border-bottom: 0; }
+td:first-child code { color: var(--text); }
+
+/* Didn't build */
+.nots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5rem 2rem; margin-top: 2.5rem; }
+.nots h3 { font-size: 1.35rem; }
+.nots p { font-size: 0.98rem; }
+
+.foot {
+  margin-top: 6rem; padding: 2.5rem 0 3rem; border-top: 1px solid var(--line);
+  display: flex; flex-wrap: wrap; gap: 1.5rem; justify-content: space-between; align-items: center;
+  font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; color: var(--muted);
+}
+.foot a { color: var(--muted-strong); text-decoration: none; margin-left: 1.25rem; }
+.foot a:hover { color: var(--text); }
+.foot .brand { display: flex; align-items: center; gap: 0.6rem; }
+
+.fine { font-size: 0.9rem; color: var(--muted); font-style: italic; margin-top: 1.25rem; max-width: 46rem; }
+
+@media (max-width: 860px) {
+  .split, .split.flip, .modes { grid-template-columns: 1fr; gap: 2rem; }
+  .cards, .nots { grid-template-columns: 1fr; }
+  .flow { grid-template-columns: 1fr; }
+  .node + .node, .node.hl + .node { border-left: 1px solid var(--line); border-top: 0; }
+  .node::after { content: "↓"; right: auto; left: 1rem; top: auto; bottom: -0.7rem; transform: none; }
+  .nav ul { display: none; }
+  .hero { padding-top: 3.5rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mark rect { animation: rise 0.6s cubic-bezier(.2,.7,.2,1) both; }
+  .mark rect:nth-child(n+8) { animation-delay: 0.12s; }
+  .mark rect:nth-child(n+10) { animation-delay: 0.24s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(4px); } }
+}
+</style>
+</head>
+<body>
+
+<div class="announce">Version 0.1.0 is on npm. Every Codex plugin you've connected, available to <a href="#plugins">any harness</a>.</div>
+
+<div class="wrap">
+  <nav class="nav" aria-label="Primary">
+    <a class="brand" href="#top" aria-label="codex-connectors-mcp home">
+      <svg viewBox="0 0 70 50" aria-hidden="true"><g fill="#ebe7e4"><rect x="0" y="0" width="30" height="10"/><rect x="0" y="10" width="10" height="30"/><rect x="0" y="40" width="30" height="10"/><rect x="40" y="20" width="10" height="10"/><rect x="50" y="10" width="20" height="30"/></g></svg>
+      CODEX-CONNECTORS-MCP
+    </a>
+    <ul>
+      <li><a href="#plugins">Plugins</a></li>
+      <li><a href="#how">How it works</a></li>
+      <li><a href="#writes">Writes</a></li>
+      <li><a href="#settings">Settings</a></li>
+      <li><a href="https://github.com/wileai/codex-connectors-mcp">GitHub</a></li>
+      <li><a href="https://www.npmjs.com/package/codex-connectors-mcp">npm</a></li>
+    </ul>
+  </nav>
+
+  <header class="hero" id="top">
+    <svg class="mark" viewBox="0 0 70 50" role="img" aria-label="codex-connectors-mcp mark">
+      <rect x="0" y="0" width="10" height="10" fill="#e3a08a"/><rect x="10" y="0" width="10" height="10" fill="#e3a08a"/><rect x="20" y="0" width="10" height="10" fill="#e3a08a"/>
+      <rect x="0" y="10" width="10" height="30" fill="#e3a08a"/>
+      <rect x="0" y="40" width="10" height="10" fill="#e3a08a"/><rect x="10" y="40" width="10" height="10" fill="#e3a08a"/><rect x="20" y="40" width="10" height="10" fill="#e3a08a"/>
+      <rect x="35" y="20" width="10" height="10" fill="#e1b06e"/>
+      <rect x="50" y="10" width="20" height="30" fill="#6a9fcc"/>
+    </svg>
+    <h1>Your Codex plugins,<br>in <em>any</em> harness</h1>
+    <p class="lede">An MCP bridge for the apps you've connected in Codex. Codex keeps the logins. Your harness picks the model. No model turn, no API key.</p>
+
+    <div class="install panel">
+      <div class="tabs" role="tablist" aria-label="Install instructions">
+        <button role="tab" aria-selected="true" aria-controls="t-json" id="b-json">MCP JSON</button>
+        <button role="tab" aria-selected="false" aria-controls="t-claude" id="b-claude">Claude Code</button>
+        <button role="tab" aria-selected="false" aria-controls="t-codex" id="b-codex">Codex TOML</button>
+        <button role="tab" aria-selected="false" aria-controls="t-http" id="b-http">HTTP</button>
+      </div>
+      <div class="tab-body" role="tabpanel" id="t-json" aria-labelledby="b-json">
+<pre>{
+  <span class="k">"mcpServers"</span>: {
+    <span class="k">"codex-connectors"</span>: {
+      <span class="k">"command"</span>: <span class="s">"npx"</span>,
+      <span class="k">"args"</span>: [<span class="s">"-y"</span>, <span class="s">"codex-connectors-mcp@latest"</span>],
+      <span class="k">"env"</span>: { <span class="k">"CODEX_CONNECTORS_WRITES"</span>: <span class="s">"ask"</span> }
+    }
+  }
+}</pre>
+        <button class="copy" type="button">[ Copy ]</button>
+      </div>
+      <div class="tab-body" role="tabpanel" id="t-claude" aria-labelledby="b-claude" hidden>
+<pre><span class="p">$ </span>claude mcp add codex-connectors \
+    -e CODEX_CONNECTORS_WRITES=ask \
+    -- npx -y codex-connectors-mcp@latest</pre>
+        <button class="copy" type="button">[ Copy ]</button>
+      </div>
+      <div class="tab-body" role="tabpanel" id="t-codex" aria-labelledby="b-codex" hidden>
+<pre><span class="c"># ~/.codex/config.toml</span>
+<span class="t">[mcp_servers.codex-connectors]</span>
+<span class="k">command</span> = <span class="s">"npx"</span>
+<span class="k">args</span> = [<span class="s">"-y"</span>, <span class="s">"codex-connectors-mcp@latest"</span>]
+<span class="k">startup_timeout_sec</span> = 120
+<span class="k">tool_timeout_sec</span> = 180
+
+<span class="t">[mcp_servers.codex-connectors.env]</span>
+<span class="k">CODEX_CONNECTORS_WRITES</span> = <span class="s">"ask"</span></pre>
+        <button class="copy" type="button">[ Copy ]</button>
+      </div>
+      <div class="tab-body" role="tabpanel" id="t-http" aria-labelledby="b-http" hidden>
+<pre><span class="p">$ </span>export CODEX_CONNECTORS_HTTP_TOKEN="$(openssl rand -hex 32)"
+<span class="p">$ </span>npx -y codex-connectors-mcp@latest --transport http --port 8787
+<span class="c"># → http://127.0.0.1:8787/mcp  ·  Authorization: Bearer $TOKEN</span></pre>
+        <button class="copy" type="button">[ Copy ]</button>
+      </div>
+    </div>
+    <p class="hint">Requires Node.js 22.19+ and a signed-in Codex CLI (<code>codex login</code>).</p>
+  </header>
+
+  <section id="plugins">
+    <div class="label">01 · Plugins</div>
+    <h2>Every Codex plugin.<br><em>Every</em> harness.</h2>
+    <div class="showcase">
+      <p class="callout">Connect an app once in Codex — Gmail, GitHub, Figma, Linear, Slack, Google Drive, Notion, anything in the catalog — and <span>use it from any agent harness</span> through this extension.</p>
+
+      <figure class="panel shot">
+        <div class="panel-bar"><span class="dot"></span>Codex · Customize · Plugins</div>
+        <img src="assets/codex-plugins.webp" width="2000" height="1093" loading="lazy"
+             alt="The Codex Plugins screen. The sidebar lists installed plugins: Slack, Tesseract, DoorDash, Figma, Granola, LinkedIn, Finances, Luma, Instacart, Linear, Gmail, Google Calendar, Google Drive, GitHub and Messages. The main pane shows the public catalog with Popular, New & Noteworthy and Productivity sections.">
+        <figcaption>Everything under “Installed” here becomes MCP tools in your harness.</figcaption>
+      </figure>
+
+      <div class="split">
+        <div class="prose">
+          <p>Codex already did the hard part: OAuth flows, token refresh, and a growing catalog of first-party app integrations. <strong>codex-connectors-mcp</strong> lifts those connected apps out of Codex and serves their tools over the Model Context Protocol, so any client that speaks MCP stdio or Streamable HTTP can call them.</p>
+          <p>Your harness never sees a credential. It sees tool names, schemas and results — exactly as Codex's app-server reports them, without truncation.</p>
+        </div>
+        <div>
+          <div class="label">Works with</div>
+          <div class="harnesses">
+            <span class="chip">Claude Code</span><span class="chip">Cursor</span><span class="chip">Pi</span>
+            <span class="chip">Codex</span><span class="chip">VS Code</span><span class="chip">Zed</span>
+            <span class="chip">Windsurf</span><span class="chip">Goose</span><span class="chip">your own agent</span>
+          </div>
+          <p class="fine">Any client with MCP stdio or Streamable HTTP support that runs as the user signed in to Codex.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="label">02 · How it works</div>
+    <h2>A bridge, <em>not</em> an agent</h2>
+    <div class="prose"><p>The bridge drives Codex's own <code>app-server</code> directly. It never starts a model turn, so there's no inference cost and no second model in the loop.</p></div>
+
+    <div class="flow" role="list" aria-label="Request path">
+      <div class="node" role="listitem"><div class="tag">Harness</div><div class="name">Your agent</div><div class="sub">Picks the model, calls tools</div></div>
+      <div class="node hl" role="listitem"><div class="tag">Bridge</div><div class="name">codex-connectors-mcp</div><div class="sub">Validates, asks, forwards</div></div>
+      <div class="node" role="listitem"><div class="tag">Codex</div><div class="name">app-server</div><div class="sub">stdio, no <code>turn/start</code></div></div>
+      <div class="node" role="listitem"><div class="tag">Auth</div><div class="name">Codex login</div><div class="sub">Holds every credential</div></div>
+      <div class="node" role="listitem"><div class="tag">Apps</div><div class="name">GitHub, Gmail, Figma…</div><div class="sub">Your connected plugins</div></div>
+    </div>
+    <p class="wire">MCP stdio | Streamable HTTP  →  JSON-RPC over stdio  →  mcpServer/tool/call</p>
+
+    <ol class="steps">
+      <li><span>Spawn <code>codex app-server --listen stdio://</code> and initialize its experimental API.</span></li>
+      <li><span>Open an ephemeral thread with apps enabled, model-adjacent features and your own MCP servers disabled.</span></li>
+      <li><span>Read <code>app/installed</code> and keep only apps Codex reports as enabled and callable, filtered by your allowlist.</span></li>
+      <li><span>Page through <code>mcpServerStatus/list</code> and join <code>codex_apps</code> tools to their apps by connector id.</span></li>
+      <li><span>Expose each tool over MCP and validate every call against its original JSON Schema (draft-07, 2019-09, 2020-12).</span></li>
+      <li><span>Forward through <code>mcpServer/tool/call</code>, preserving content blocks, structured content, errors and metadata.</span></li>
+      <li><span>On shutdown, close the child process and remove its temporary workspace.</span></li>
+    </ol>
+  </section>
+
+  <section id="tools">
+    <div class="label">03 · Tools</div>
+    <h2>Two ways to see your apps</h2>
+    <div class="modes">
+      <div class="panel">
+        <div class="panel-bar"><span class="dot"></span>Direct mode · default</div>
+        <div class="body">
+          <p>Every enabled connector tool appears in <code>tools/list</code> with its full input schema and provider annotations, under stable ASCII names of 64 characters or fewer.</p>
+<pre><span class="k">github_get_profile_3b5eaf4306c5</span>
+<span class="c">&lt;app&gt;_&lt;tool&gt;_&lt;hash&gt;  for every other tool</span>
+<span class="c">… plus the three dispatcher tools</span></pre>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-bar"><span class="dot"></span>Compact mode · CODEX_CONNECTORS_MODE=compact</div>
+        <div class="body">
+          <p>Only three tools. Everything stays callable through the dispatcher, which is handy when a harness caps tool counts or hundreds of schemas would crowd the context.</p>
+<pre><span class="k">codex_connectors</span>({<span class="s">"connector"</span>:<span class="s">"GitHub"</span>,<span class="s">"query"</span>:<span class="s">"profile"</span>})
+<span class="k">codex_connector_schema</span>({<span class="s">"tool"</span>:<span class="s">"github.get_profile"</span>})
+<span class="k">codex_connector_call</span>({<span class="s">"tool"</span>:<span class="s">"github.get_profile"</span>,
+                      <span class="s">"arguments"</span>:{}})</pre>
+        </div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Tool</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>codex_connectors</code></td><td>List apps; filter tools by <code>connector</code> and/or <code>query</code>; paginate with <code>offset</code>/<code>limit</code>; reload with <code>refresh: true</code>.</td></tr>
+          <tr><td><code>codex_connector_schema</code></td><td>The full original tool definition, plus its exposed name.</td></tr>
+          <tr><td><code>codex_connector_call</code></td><td>Call by original or exposed name with an <code>arguments</code> object.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="writes">
+    <div class="label">04 · Writes</div>
+    <h2>Reads flow. <em>Writes</em> ask first.</h2>
+    <div class="prose"><p>Anything not marked read-only goes through a write policy. By default you approve each write through MCP form elicitation, which shows the exact tool and arguments.</p></div>
+    <div class="cards">
+      <div class="card def"><div class="tag">ask · default</div><h3>Approve each one</h3><p>The bridge shows the tool and its arguments in an elicitation form. Clients that can't elicit can't write.</p></div>
+      <div class="card"><div class="tag">allow</div><h3>Trust the harness</h3><p>For harnesses that already confirm MCP calls. The bridge adds no extra prompt.</p></div>
+      <div class="card"><div class="tag">deny</div><h3>Read-only bridge</h3><p>Reject anything not marked read-only, and everything marked destructive.</p></div>
+    </div>
+    <p class="fine">Calls time out after 120&nbsp;s. If a write's outcome is unknown (timeout, cancellation, app-server crash), the bridge never retries it and blocks further writes until you've checked the app. Approval payloads over 20,000 characters fail rather than being silently shortened.</p>
+  </section>
+
+  <section id="settings">
+    <div class="label">05 · Settings</div>
+    <h2>Five variables. That's the config.</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Variable</th><th>Default</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>CODEX_CONNECTORS_CODEX</code></td><td><code>codex</code></td><td>Path to the Codex executable.</td></tr>
+          <tr><td><code>CODEX_CONNECTORS_MODE</code></td><td><code>direct</code></td><td><code>direct</code> or <code>compact</code>.</td></tr>
+          <tr><td><code>CODEX_CONNECTORS_WRITES</code></td><td><code>ask</code></td><td><code>ask</code>, <code>allow</code> or <code>deny</code>.</td></tr>
+          <tr><td><code>CODEX_CONNECTORS_ALLOW</code></td><td>All eligible apps</td><td>Comma-separated connector names or IDs, case-insensitive. An explicitly empty value exposes nothing.</td></tr>
+          <tr><td><code>CODEX_CONNECTORS_HTTP_TOKEN</code></td><td>Unset</td><td>Bearer token for HTTP transport, at least 32 characters.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="fine">CLI flags: <code>--transport stdio|http</code>, <code>--mode direct|compact</code>, <code>--port 8787</code>, <code>--help</code>. Diagnostics go to stderr; stdout carries only MCP messages.</p>
+
+    <div class="split flip" style="margin-top:4rem">
+      <div class="prose">
+        <h3>Streamable HTTP</h3>
+        <p>For clients that want a URL instead of a subprocess. The listener binds to loopback only, checks Host and Origin, and requires the bearer token on every request.</p>
+        <p>Up to 16 independent sessions, each with its own lazily started app-server. Idle sessions expire after 30 minutes.</p>
+      </div>
+      <div class="panel">
+        <div class="panel-bar"><span class="dot"></span>Client config</div>
+<pre style="padding:1.25rem 1.4rem">{
+  <span class="k">"url"</span>: <span class="s">"http://127.0.0.1:8787/mcp"</span>,
+  <span class="k">"headers"</span>: {
+    <span class="k">"Authorization"</span>: <span class="s">"Bearer &lt;CODEX_CONNECTORS_HTTP_TOKEN&gt;"</span>
+  }
+}</pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="not">
+    <div class="label">06 · Scope</div>
+    <h2>What we didn't build</h2>
+    <div class="nots">
+      <div><h3>No model</h3><p>The bridge never calls <code>turn/start</code>. Your harness's model does the thinking; Codex just serves the apps.</p></div>
+      <div><h3>No API keys</h3><p>Authentication stays with your <code>codex login</code>. The bridge doesn't read credentials itself.</p></div>
+      <div><h3>No disk cache</h3><p>Connector responses are forwarded, never written to disk, and never truncated.</p></div>
+      <div><h3>No auto-retry</h3><p>A write with an unknown outcome is never retried, and it blocks further writes until you've checked.</p></div>
+      <div><h3>No hosted multi-user</h3><p>It's a local, single-account bridge. Cloud-only harnesses need their own secured route to it.</p></div>
+      <div><h3>No skill install</h3><p>It bridges a plugin's app tools. Skills bundled with a Codex plugin stay in Codex.</p></div>
+    </div>
+    <p class="fine">Installing the bridge means sharing app names, tool schemas and tool results with your harness and its model provider. Read-only tools can still return private data, so use <code>CODEX_CONNECTORS_ALLOW</code> to share only the apps you intend to.</p>
+  </section>
+
+  <footer class="foot">
+    <div class="brand">
+      <svg viewBox="0 0 70 50" width="22" aria-hidden="true"><g fill="#9fa4ab"><rect x="0" y="0" width="30" height="10"/><rect x="0" y="10" width="10" height="30"/><rect x="0" y="40" width="30" height="10"/><rect x="35" y="20" width="10" height="10"/><rect x="50" y="10" width="20" height="30"/></g></svg>
+      MIT · © 2026 Wile
+    </div>
+    <div>
+      <a href="https://github.com/wileai/codex-connectors-mcp">GitHub</a>
+      <a href="https://www.npmjs.com/package/codex-connectors-mcp">npm</a>
+      <a href="https://github.com/wileai/codex-connectors-mcp/issues">Issues</a>
+      <a href="https://github.com/wileai/codex-connectors-mcp/blob/main/integration/SCENARIOS.md">Test scenarios</a>
+    </div>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var tabs = document.querySelectorAll('.tabs [role="tab"]');
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      tabs.forEach(function (t) {
+        var on = t === tab;
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+        document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+      });
+    });
+  });
+  document.querySelectorAll('.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var text = btn.parentElement.querySelector('pre').innerText
+        .split('\n').map(function (l) { return l.replace(/^\$ /, ''); })
+        .filter(function (l) { return !/^# /.test(l.trim()) || btn.parentElement.id === 't-codex'; })
+        .join('\n');
+      var done = function () {
+        btn.textContent = '[ Copied ]'; btn.classList.add('done');
+        setTimeout(function () { btn.textContent = '[ Copy ]'; btn.classList.remove('done'); }, 1600);
+      };
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, function () {});
+    });
+  });
+})();
+</script>
+</body>
+</html>

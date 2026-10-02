@@ -4,6 +4,8 @@ Use your connected Codex apps from any harness supporting **MCP stdio** or
 **Streamable HTTP**. Codex owns authentication; the harness chooses the model.
 No Codex model turn, API key, or Pi dependency is involved.
 
+Website: **https://wileai.github.io/codex-connectors-mcp/**
+
 ## Quick start
 
 Requires Node.js 22.19+ and a Codex CLI with `app/installed` and
