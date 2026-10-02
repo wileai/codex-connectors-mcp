@@ -1,6 +1,6 @@
 {
-  "name": "codex-connectors-mcp",
-  "version": "0.1.0",
+  "name": "@wileai/codex-connectors-mcp",
+  "version": "0.1.1",
   "description": "Expose connected Codex apps to MCP harnesses without running a model",
   "type": "module",
   "bin": {

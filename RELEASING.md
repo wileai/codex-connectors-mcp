@@ -2,11 +2,14 @@
 
 ## One-time setup
 
-1. Add a repository Actions secret named `NPM_TOKEN` in
+1. Use the organization Actions secret named `NPM_TOKEN` (with this repository
+   granted access), or add a repository secret with that name in
    [GitHub settings](https://github.com/wileai/codex-connectors-mcp/settings/secrets/actions/new).
    Use an npm granular token with direct read/write publishing permission and
-   bypass 2FA enabled. It must allow creating `codex-connectors-mcp` for the first
-   publish, then publishing subsequent versions. A stage-only token cannot publish
+   bypass 2FA enabled. It must allow creating `@wileai/codex-connectors-mcp` for the first
+   publish, then publishing subsequent versions. The token must grant read/write
+   access to the `@wileai` scope, and its owner must have publishing rights in
+   the npm organization. A stage-only token cannot publish
    automatically. Never paste the token into an issue, chat, or committed file.
 2. Alternatively, run `gh secret set NPM_TOKEN --repo wileai/codex-connectors-mcp`
    locally and paste it at the hidden prompt. No token is needed by package users.
@@ -16,7 +19,9 @@ After the initial publish, you can replace the token with
 [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/): configure
 GitHub owner `wileai`, repository `codex-connectors-mcp`, workflow `publish.yml`,
 no environment, and allow direct `npm publish`. Then remove the `NPM_TOKEN`
-repository secret. The workflow already grants OIDC permission and runs Node 24
+secret access for this repository once no other workflow here needs it. Do not
+remove an organization secret still used by other repositories. The workflow
+already grants OIDC permission and runs Node 24
 with an OIDC-capable npm version. Trusted publishing avoids token expiration and
 rotation; token-based publishing requires renewing the secret before expiration.
 
@@ -34,8 +39,8 @@ rotation; token-based publishing requires renewing the secret before expiration.
    No version bump commit or force push is needed. The source checkout can keep
    its development version; published packages and MCP report the release version.
 4. Confirm the [workflow](https://github.com/wileai/codex-connectors-mcp/actions/workflows/publish.yml)
-   succeeded, then run `npm view codex-connectors-mcp version` and
-   `npx -y codex-connectors-mcp@latest --help`.
+   succeeded, then run `npm view @wileai/codex-connectors-mcp version` and
+   `npx -y @wileai/codex-connectors-mcp@latest --help`.
 
 Stable tags publish to `latest`. For a prerelease, use a tag such as
 `v0.2.0-beta.1` **and** check GitHub's prerelease box; it publishes to `next`.

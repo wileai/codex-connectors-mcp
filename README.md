@@ -1,10 +1,15 @@
-# codex-connectors-mcp
+# @wileai/codex-connectors-mcp
 
 Use your connected Codex apps from any harness supporting **MCP stdio** or
 **Streamable HTTP**. Codex owns authentication; the harness chooses the model.
 No Codex model turn, API key, or Pi dependency is involved.
 
 Website: **https://wileai.github.io/codex-connectors-mcp/**
+
+The npm package is now published under the Wile organization as
+`@wileai/codex-connectors-mcp`. Existing users should replace
+`codex-connectors-mcp@latest` in their harness configuration with
+`@wileai/codex-connectors-mcp@latest`; the executable name remains unchanged.
 
 ## Quick start
 
@@ -22,7 +27,7 @@ Add this to your harness's MCP configuration (no clone or build required):
   "mcpServers": {
     "codex-connectors": {
       "command": "npx",
-      "args": ["-y", "codex-connectors-mcp@latest"],
+      "args": ["-y", "@wileai/codex-connectors-mcp@latest"],
       "env": {
         "CODEX_CONNECTORS_ALLOW": "GitHub"
       }
@@ -32,7 +37,7 @@ Add this to your harness's MCP configuration (no clone or build required):
 ```
 
 `@latest` checks for the current stable version when the server starts; restart
-your harness to pick up updates. Pin `codex-connectors-mcp@0.1.0` when you need
+your harness to pick up updates. Pin `@wileai/codex-connectors-mcp@0.1.1` when you need
 a fixed version. Prereleases are available through `@next`.
 
 For Codex, add this to `~/.codex/config.toml`:
@@ -40,7 +45,7 @@ For Codex, add this to `~/.codex/config.toml`:
 ```toml
 [mcp_servers.codex-connectors]
 command = "npx"
-args = ["-y", "codex-connectors-mcp@latest"]
+args = ["-y", "@wileai/codex-connectors-mcp@latest"]
 startup_timeout_sec = 120
 tool_timeout_sec = 180
 
@@ -146,7 +151,7 @@ For clients using an MCP URL rather than a subprocess:
 
 ```sh
 export CODEX_CONNECTORS_HTTP_TOKEN="$(openssl rand -hex 32)"
-npx -y codex-connectors-mcp@latest --transport http --port 8787
+npx -y @wileai/codex-connectors-mcp@latest --transport http --port 8787
 ```
 
 Configure the client with `http://127.0.0.1:8787/mcp` and
