@@ -264,7 +264,7 @@ td:first-child code { color: var(--text); }
 </head>
 <body>
 
-<div class="announce">Version 0.1.0 is on npm. Every Codex plugin you've connected, available to <a href="#plugins">any harness</a>.</div>
+<div class="announce">Published on npm as @wileai/codex-connectors-mcp. Every Codex plugin you've connected, available to <a href="#plugins">any harness</a>.</div>
 
 <div class="wrap">
   <nav class="nav" aria-label="Primary">
@@ -278,7 +278,7 @@ td:first-child code { color: var(--text); }
       <li><a href="#writes">Writes</a></li>
       <li><a href="#settings">Settings</a></li>
       <li><a href="https://github.com/wileai/codex-connectors-mcp">GitHub</a></li>
-      <li><a href="https://www.npmjs.com/package/codex-connectors-mcp">npm</a></li>
+      <li><a href="https://www.npmjs.com/package/@wileai/codex-connectors-mcp">npm</a></li>
     </ul>
   </nav>
 
@@ -305,28 +305,28 @@ td:first-child code { color: var(--text); }
   <span class="k">"mcpServers"</span>: {
     <span class="k">"codex-connectors"</span>: {
       <span class="k">"command"</span>: <span class="s">"npx"</span>,
-      <span class="k">"args"</span>: [<span class="s">"-y"</span>, <span class="s">"codex-connectors-mcp@latest"</span>]
+      <span class="k">"args"</span>: [<span class="s">"-y"</span>, <span class="s">"@wileai/codex-connectors-mcp@latest"</span>]
     }
   }
 }</pre>
         <button class="copy" type="button">[ Copy ]</button>
       </div>
       <div class="tab-body" role="tabpanel" id="t-claude" aria-labelledby="b-claude" hidden>
-<pre><span class="p">$ </span>claude mcp add codex-connectors -- npx -y codex-connectors-mcp@latest</pre>
+<pre><span class="p">$ </span>claude mcp add codex-connectors -- npx -y @wileai/codex-connectors-mcp@latest</pre>
         <button class="copy" type="button">[ Copy ]</button>
       </div>
       <div class="tab-body" role="tabpanel" id="t-codex" aria-labelledby="b-codex" hidden>
 <pre><span class="c"># ~/.codex/config.toml</span>
 <span class="t">[mcp_servers.codex-connectors]</span>
 <span class="k">command</span> = <span class="s">"npx"</span>
-<span class="k">args</span> = [<span class="s">"-y"</span>, <span class="s">"codex-connectors-mcp@latest"</span>]
+<span class="k">args</span> = [<span class="s">"-y"</span>, <span class="s">"@wileai/codex-connectors-mcp@latest"</span>]
 <span class="k">startup_timeout_sec</span> = 120
 <span class="k">tool_timeout_sec</span> = 180</pre>
         <button class="copy" type="button">[ Copy ]</button>
       </div>
       <div class="tab-body" role="tabpanel" id="t-http" aria-labelledby="b-http" hidden>
 <pre><span class="p">$ </span>export CODEX_CONNECTORS_HTTP_TOKEN="$(openssl rand -hex 32)"
-<span class="p">$ </span>npx -y codex-connectors-mcp@latest --transport http --port 8787
+<span class="p">$ </span>npx -y @wileai/codex-connectors-mcp@latest --transport http --port 8787
 <span class="c"># → http://127.0.0.1:8787/mcp  ·  Authorization: Bearer $TOKEN</span></pre>
         <button class="copy" type="button">[ Copy ]</button>
       </div>
@@ -494,7 +494,7 @@ td:first-child code { color: var(--text); }
     </div>
     <div>
       <a href="https://github.com/wileai/codex-connectors-mcp">GitHub</a>
-      <a href="https://www.npmjs.com/package/codex-connectors-mcp">npm</a>
+      <a href="https://www.npmjs.com/package/@wileai/codex-connectors-mcp">npm</a>
       <a href="https://github.com/wileai/codex-connectors-mcp/issues">Issues</a>
       <a href="https://github.com/wileai/codex-connectors-mcp/blob/main/integration/SCENARIOS.md">Test scenarios</a>
     </div>
