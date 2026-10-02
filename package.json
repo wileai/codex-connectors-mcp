@@ -7,9 +7,11 @@
     "codex-connectors-mcp": "dist/cli.js"
   },
   "files": [
-    "dist/",
+    "dist/*.js",
+    "dist/*.d.ts",
     "README.md",
-    "NOTICE"
+    "NOTICE",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=22.19"
@@ -30,5 +32,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.9.0"
-  }
+  },
+  "license": "MIT",
+  "author": "Wile <info@wile.ai>"
 }

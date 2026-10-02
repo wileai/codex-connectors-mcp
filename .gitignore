@@ -2,3 +2,11 @@ node_modules/
 dist/
 *.tgz
 .env
+
+# Local credentials and environment overrides
+.env.*
+!.env.example
+!.env.*.example
+.npmrc
+*.pem
+*.key

@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AppServerClient, OutcomeUnknownError } from "./app-server.js";
+import { CatalogChangedError, PublicError } from "./errors.js";
 
 /**
  * Codex connectors ("apps") through a model-free Codex app-server thread.
@@ -120,14 +121,16 @@ export class CodexConnectors {
 		return (await this.ready()).tools.get(name);
 	}
 
-	async call(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<ToolCallResult> {
+	async call(name: string, args: Record<string, unknown>, signal?: AbortSignal, expectedTool?: ConnectorTool): Promise<ToolCallResult> {
 		const session = await this.ready();
+		// Approval and validation must apply to this exact discovered tool/session.
+		if (expectedTool && session.tools.get(name) !== expectedTool) throw new CatalogChangedError();
 		if (!session.tools.has(name)) {
-			throw new Error(`Unknown Codex connector tool "${name}". Use codex_connectors to find available tools.`);
+			throw new PublicError(`Unknown Codex connector tool "${name}". Use codex_connectors to find available tools.`);
 		}
 		const tool = session.tools.get(name)!;
 		if (this.writeOutcomeUnknown && (!tool.readOnly || tool.destructive)) {
-			throw new Error("Writes blocked after an unknown connector outcome. Verify the previous action in the connected app, then restart the MCP server before writing again.");
+			throw new PublicError("Writes blocked after an unknown connector outcome. Verify the previous action in the connected app, then restart the MCP server before writing again.");
 		}
 		const result = await session.client.request<{
 			content?: McpContent[];
@@ -175,7 +178,7 @@ export class CodexConnectors {
 	}
 
 	private async ready(): Promise<Session> {
-		if (this.closed) throw new Error("Codex connectors are closed");
+		if (this.closed) throw new PublicError("Codex connectors are closed");
 		this.session ??= this.start();
 		const current = this.session;
 		let session: Session;
@@ -255,17 +258,17 @@ export class CodexConnectors {
 			);
 			for (const server of result.data) {
 				if (server.name !== APPS_SERVER) continue;
-				if (server.toolsError) throw new Error(`Codex could not load connector tools: ${server.toolsError}`);
+				if (server.toolsError) throw new PublicError("Codex could not load connector tools. Check your connected apps in Codex.");
 				tools.push(...Object.values(server.tools));
 			}
 			cursor = result.nextCursor;
 			if (!cursor) return tools;
 		}
-		throw new Error("Codex tool catalog exceeded the pagination limit");
+		throw new PublicError("Codex tool catalog exceeded the pagination limit");
 	}
 
 	private async answerServerRequest(method: string, params: unknown): Promise<unknown> {
-		if (method !== "mcpServer/elicitation/request") throw new Error(`Unsupported server request ${method}`);
+		if (method !== "mcpServer/elicitation/request") throw new PublicError(`Unsupported server request ${method}`);
 		const request = params as {
 			serverName?: string; mode?: string; message?: string; url?: string;
 			elicitationId?: string; requestedSchema?: unknown;

@@ -7,6 +7,7 @@ import { fullFormats } from "ajv-formats/dist/formats.js";
 import { CallToolRequestSchema, ListToolsRequestSchema, type Tool, type CallToolResult, type ElicitRequestFormParams } from "@modelcontextprotocol/sdk/types.js";
 import { CodexConnectors, type ConnectorTool, type ElicitationRequest } from "./connectors.js";
 import { OutcomeUnknownError } from "./app-server.js";
+import { CatalogChangedError, PublicError, publicErrorMessage } from "./errors.js";
 
 export interface Options {
   mode: "direct" | "compact";
@@ -46,7 +47,7 @@ export function createBridge(options: Options) {
     const dialect = String(schema.$schema ?? "");
     const validator = dialect.includes("2020-12") ? validators.current : dialect.includes("2019-09") ? validators.previous : validators.legacy;
     const check = validator.compile(schema);
-    if (!check(args)) throw new Error(`Invalid arguments: ${validator.errorsText(check.errors)}`);
+    if (!check(args)) throw new PublicError("Invalid arguments: input does not match the tool schema.");
   };
   const service = new CodexConnectors({ command: options.command, onElicitation: forwardElicitation });
   let catalog: Promise<Map<string, ConnectorTool>> | undefined;
@@ -56,7 +57,7 @@ export function createBridge(options: Options) {
   // second write cannot slip past the unknown-outcome guard on this connection.
   const serial = <T>(run: () => Promise<T>): Promise<T> => {
     const result = operationQueue.then(() => {
-      if (closed) throw new Error("MCP connection closed");
+      if (closed) throw new PublicError("MCP connection closed");
       return run();
     });
     operationQueue = result.catch(() => {});
@@ -67,7 +68,7 @@ export function createBridge(options: Options) {
       const map = new Map<string, ConnectorTool>();
       for (const tool of connectors.flatMap((c) => c.tools)) {
         const name = exposedName(tool.name);
-        if (map.has(name)) throw new Error(`Tool name collision: ${name}`);
+        if (map.has(name)) throw new PublicError(`Tool name collision: ${name}`);
         map.set(name, tool);
       }
       return map;
@@ -77,7 +78,7 @@ export function createBridge(options: Options) {
   async function resolve(name: string) {
     const map = await tools();
     const tool = map.get(name) ?? [...map.values()].find((t) => t.name === name);
-    if (!tool) throw new Error(`Unknown connector tool: ${name}`);
+    if (!tool) throw new PublicError(`Unknown connector tool: ${name}`);
     return tool;
   }
   function definition(tool: ConnectorTool): Tool {
@@ -103,13 +104,15 @@ export function createBridge(options: Options) {
       return { action: result.action, content: result.content ?? null, _meta: null };
     } catch { return decline; }
   }
-  server.setRequestHandler(ListToolsRequestSchema, () => serial(async () => ({
-    // One complete list avoids clients that fail to follow tools/list pagination.
-    tools: options.mode === "compact" ? management : [...management, ...[...(await tools()).values()].map(definition)],
-  })));
+  server.setRequestHandler(ListToolsRequestSchema, () => serial(async () => {
+    try {
+      // One complete list avoids clients that fail to follow tools/list pagination.
+      return { tools: options.mode === "compact" ? management : [...management, ...[...(await tools()).values()].map(definition)] };
+    } catch (error) { throw new PublicError(publicErrorMessage(error)); }
+  }));
   server.setRequestHandler(CallToolRequestSchema, (request, extra) => serial(async () => {
     try {
-      if (extra.signal.aborted) throw new Error("Request cancelled before dispatch");
+      if (extra.signal.aborted) throw new PublicError("Request cancelled before dispatch");
       const name = request.params.name;
       const args = request.params.arguments ?? {};
       const builtin = management.find((t) => t.name === name);
@@ -138,21 +141,29 @@ export function createBridge(options: Options) {
       validate(tool.inputSchema, input);
       const write = !tool.readOnly || tool.destructive;
       if (write) {
-        if (safety.writeOutcomeUnknown) throw new Error("Writes blocked after an unknown outcome. Verify the previous action in the connected app, then restart this MCP server.");
-        if (options.writes === "deny") throw new Error("Write blocked by CODEX_CONNECTORS_WRITES=deny");
+        if (safety.writeOutcomeUnknown) throw new PublicError("Writes blocked after an unknown outcome. Verify the previous action in the connected app, then restart this MCP server.");
+        if (options.writes === "deny") throw new PublicError("Write blocked by CODEX_CONNECTORS_WRITES=deny");
         if (options.writes === "ask") {
           const payload = JSON.stringify(input, null, 2);
-          if (payload.length > 20000) throw new Error("Write arguments exceed the approval display limit; nothing was sent.");
+          if (payload.length > 20000) throw new PublicError("Write arguments exceed the approval display limit; nothing was sent.");
           const capability = server.getClientCapabilities()?.elicitation;
-          if (!capability || (!capability.form && Object.keys(capability).length > 0)) throw new Error("This client cannot approve writes via MCP elicitation. Configure CODEX_CONNECTORS_WRITES=allow only if the harness handles approval, or use deny.");
+          if (!capability || (!capability.form && Object.keys(capability).length > 0)) throw new PublicError("This client cannot approve writes via MCP elicitation. Configure CODEX_CONNECTORS_WRITES=allow only if the harness handles approval, or use deny.");
           const approval = await server.elicitInput({ mode: "form", message: `Allow ${tool.connectorName}: ${tool.name}?\n${payload}`, requestedSchema: { type: "object", properties: { approve: { type: "boolean", title: "Approve this exact operation", default: false } }, required: ["approve"] } }, { signal: extra.signal });
-          if (approval.action !== "accept" || approval.content?.approve !== true) throw new Error("Write declined; nothing was sent.");
+          if (approval.action !== "accept" || approval.content?.approve !== true) throw new PublicError("Write declined; nothing was sent.");
         }
       }
-      try { return await service.call(tool.name, input, extra.signal) as CallToolResult; }
-      catch (error) { if (write && error instanceof OutcomeUnknownError) safety.writeOutcomeUnknown = true; throw error; }
+      try { return await service.call(tool.name, input, extra.signal, tool) as CallToolResult; }
+      catch (error) {
+        if (write && error instanceof OutcomeUnknownError) safety.writeOutcomeUnknown = true;
+        if (error instanceof CatalogChangedError) {
+          catalog = undefined; revision++;
+          // Never retry the call or reuse an approval after reconnecting.
+          await server.sendToolListChanged().catch(() => {});
+        }
+        throw error;
+      }
     } catch (error) {
-      return { content: [{ type: "text" as const, text: error instanceof Error ? error.message : String(error) }], isError: true };
+      return { content: [{ type: "text" as const, text: publicErrorMessage(error) }], isError: true };
     }
   }));
   let cleanup: Promise<void> | undefined;

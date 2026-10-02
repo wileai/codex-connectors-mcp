@@ -1,5 +1,6 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
+import { PublicError } from "./errors.js";
 
 /**
  * Minimal JSON-RPC client for `codex app-server --listen stdio://`.
@@ -38,13 +39,12 @@ export interface RequestOptions {
 	signal?: AbortSignal;
 }
 
-export class OutcomeUnknownError extends Error {
+export class OutcomeUnknownError extends PublicError {
 	constructor(reason: string) {
 		super(`${reason}. Connector outcome unknown: it may still complete. Do not retry a write; verify its state in the connected app first.`);
 	}
 }
 
-const MAX_STDERR_TAIL = 4096;
 const DEFAULT_TIMEOUT_MS = 60_000;
 
 export class AppServerClient {
@@ -53,7 +53,6 @@ export class AppServerClient {
 	private readonly pending = new Map<number, Pending>();
 	private readonly onServerRequest: ServerRequestHandler | undefined;
 	private nextId = 0;
-	private stderrTail = "";
 	private exited: Error | undefined;
 	private readonly exitWaiters: Array<() => void> = [];
 
@@ -90,7 +89,7 @@ export class AppServerClient {
 
 	request<T>(method: string, params: unknown, options: RequestOptions = {}): Promise<T> {
 		if (this.exited) return Promise.reject(this.exited);
-		if (options.signal?.aborted) return Promise.reject(new Error(`${method} was aborted`));
+		if (options.signal?.aborted) return Promise.reject(new PublicError(`${method} was aborted`));
 		const id = ++this.nextId;
 		return new Promise<T>((resolve, reject) => {
 			const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -98,12 +97,12 @@ export class AppServerClient {
 				this.pending.get(id)?.cleanup();
 				this.pending.delete(id);
 				const reason = `Codex app-server did not answer ${method} within ${Math.round(timeoutMs / 1000)}s`;
-				reject(method === "mcpServer/tool/call" ? new OutcomeUnknownError(reason) : new Error(reason));
+				reject(method === "mcpServer/tool/call" ? new OutcomeUnknownError(reason) : new PublicError(reason));
 			}, timeoutMs);
 			const onAbort = () => {
 				this.pending.get(id)?.cleanup();
 				this.pending.delete(id);
-				reject(method === "mcpServer/tool/call" ? new OutcomeUnknownError(`${method} was aborted after dispatch`) : new Error(`${method} was aborted`));
+				reject(method === "mcpServer/tool/call" ? new OutcomeUnknownError(`${method} was aborted after dispatch`) : new PublicError(`${method} was aborted`));
 			};
 			options.signal?.addEventListener("abort", onAbort, { once: true });
 			this.pending.set(id, {
@@ -136,9 +135,8 @@ export class AppServerClient {
 	}
 
 	private attach(): void {
-		this.child.stderr.on("data", (chunk: Buffer) => {
-			this.stderrTail = (this.stderrTail + chunk.toString("utf8")).slice(-MAX_STDERR_TAIL);
-		});
+		// Drain diagnostics without retaining or forwarding potentially private text.
+		this.child.stderr.resume();
 		this.child.stdin.on("error", () => {
 			// Reported through the exit handler.
 		});
@@ -147,8 +145,7 @@ export class AppServerClient {
 		});
 		const onGone = (reason: string) => {
 			if (this.exited) return;
-			const tail = this.stderrTail.trim();
-			this.exited = new Error(`Codex app-server ${reason}${tail ? `: ${tail.slice(-500)}` : ""}`);
+			this.exited = new PublicError(`Codex app-server ${reason}`);
 			for (const pending of this.pending.values()) {
 				pending.cleanup();
 				pending.reject(pending.method === "mcpServer/tool/call" ? new OutcomeUnknownError("Codex app-server disconnected") : this.exited);
@@ -156,7 +153,7 @@ export class AppServerClient {
 			this.pending.clear();
 			for (const resolve of this.exitWaiters.splice(0)) resolve();
 		};
-		this.child.on("error", (error) => onGone(`failed to start (${error.message})`));
+		this.child.on("error", () => onGone("failed to start. Check the configured Codex executable."));
 		this.child.on("exit", (code, signal) => onGone(`exited (${signal ?? `code ${code}`})`));
 	}
 
@@ -178,7 +175,7 @@ export class AppServerClient {
 		this.pending.delete(message.id);
 		pending.cleanup();
 		if (message.error) {
-			pending.reject(new Error(`${pending.method} failed: ${message.error.message ?? JSON.stringify(message.error)}`));
+			pending.reject(new PublicError("Codex app-server rejected the request. Check your local Codex setup."));
 		} else {
 			pending.resolve(message.result);
 		}
@@ -186,11 +183,11 @@ export class AppServerClient {
 
 	private async answerServerRequest(id: number | string, method: string, params: unknown): Promise<void> {
 		try {
-			if (!this.onServerRequest) throw new Error(`Unsupported server request ${method}`);
+			if (!this.onServerRequest) throw new PublicError(`Unsupported server request ${method}`);
 			const result = await this.onServerRequest(method, params);
 			this.write({ id, result });
-		} catch (error) {
-			this.write({ id, error: { code: -32601, message: error instanceof Error ? error.message : String(error) } });
+		} catch {
+			this.write({ id, error: { code: -32601, message: "Server request could not be handled" } });
 		}
 	}
 

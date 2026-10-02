@@ -1,4 +1,4 @@
-The app-server transport and connector discovery implementation are adapted from
-the user's pi-codex-connectors repository, revision
-0e9709ea1e31a6e8b8b1435d8f084b516dec23a1.
+The app-server transport and connector discovery implementation include code
+adapted from Wile's Pi connector bridge.
 This project does not depend on Pi at runtime.
+See LICENSE for the MIT license terms.

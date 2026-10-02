@@ -5,6 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { createBridge, type Options } from "./server.js";
+import { PublicError, publicErrorMessage } from "./errors.js";
 
 async function main() {
   const args = process.argv.slice(2);
@@ -23,15 +24,15 @@ HTTP binds to 127.0.0.1 only. Endpoint: /mcp. No model turns are run.`);
   }
   const flags = new Map<string, string>();
   for (let i = 0; i < args.length; i += 2) {
-    if (!["--transport", "--port", "--mode"].includes(args[i]) || !args[i + 1]) throw new Error(`Invalid option: ${args[i]}. Use --help.`);
+    if (!["--transport", "--port", "--mode"].includes(args[i]) || !args[i + 1]) throw new PublicError(`Invalid option: ${args[i]}. Use --help.`);
     flags.set(args[i], args[i + 1]);
   }
   const transport = flags.get("--transport") ?? "stdio";
   const mode = flags.get("--mode") ?? process.env.CODEX_CONNECTORS_MODE ?? "direct";
   const writes = process.env.CODEX_CONNECTORS_WRITES ?? "ask";
-  if (transport !== "stdio" && transport !== "http") throw new Error("transport must be stdio or http");
-  if (mode !== "direct" && mode !== "compact") throw new Error("mode must be direct or compact");
-  if (writes !== "ask" && writes !== "allow" && writes !== "deny") throw new Error("CODEX_CONNECTORS_WRITES must be ask, allow, or deny");
+  if (transport !== "stdio" && transport !== "http") throw new PublicError("transport must be stdio or http");
+  if (mode !== "direct" && mode !== "compact") throw new PublicError("mode must be direct or compact");
+  if (writes !== "ask" && writes !== "allow" && writes !== "deny") throw new PublicError("CODEX_CONNECTORS_WRITES must be ask, allow, or deny");
   const options: Options = { mode, writes, command: process.env.CODEX_CONNECTORS_CODEX };
   let shutdown: () => Promise<void>;
   if (transport === "stdio") {
@@ -40,9 +41,9 @@ HTTP binds to 127.0.0.1 only. Endpoint: /mcp. No model turns are run.`);
     shutdown = () => bridge.close();
   } else {
     const port = Number(flags.get("--port") ?? 8787);
-    if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error("Invalid port");
+    if (!Number.isInteger(port) || port < 0 || port > 65535) throw new PublicError("Invalid port");
     const token = process.env.CODEX_CONNECTORS_HTTP_TOKEN;
-    if (!token || token.length < 32) throw new Error("HTTP requires CODEX_CONNECTORS_HTTP_TOKEN with at least 32 characters");
+    if (!token || token.length < 32) throw new PublicError("HTTP requires CODEX_CONNECTORS_HTTP_TOKEN with at least 32 characters");
     const expected = Buffer.from(`Bearer ${token}`);
     type Session = { bridge: ReturnType<typeof createBridge>; transport: StreamableHTTPServerTransport; touched: number; active: number };
     const sessions = new Map<string, Session>();
@@ -114,4 +115,4 @@ HTTP binds to 127.0.0.1 only. Endpoint: /mcp. No model turns are run.`);
     void shutdown().then(() => process.exit(0), () => process.exit(1));
   });
 }
-main().catch((error) => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; });
+main().catch((error) => { console.error(publicErrorMessage(error)); process.exitCode = 1; });

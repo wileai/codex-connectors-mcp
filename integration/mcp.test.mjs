@@ -155,3 +155,37 @@ test("HTTP: authentication, origin checks, independent sessions, real read, DELE
   child.kill("SIGTERM"); await once(child, "exit");
   assert.equal(child.exitCode, 0);
 });
+
+
+test("reconnect: reject stale authorization, notify, then allow a fresh read", { timeout: 180_000 }, async (t) => {
+  const { client, transport } = await stdio({ CODEX_CONNECTORS_ALLOW: "GitHub" });
+  t.after(() => client.close());
+  const listed = await client.listTools({}, requestOptions);
+  const profile = listed.tools.find((tool) => tool.name.startsWith("github_get_profile_"));
+  assert.ok(profile);
+  let notified = false;
+  client.setNotificationHandler(ToolListChangedNotificationSchema, () => { notified = true; });
+  const appPids = children(transport.pid);
+  assert.equal(appPids.length, 1);
+  process.kill(appPids[0], "SIGKILL");
+  await until(() => !running(appPids[0]));
+  // Even an unchanged tool must not reuse authorization from the old session.
+  const stale = await call(client, profile.name);
+  assert.equal(stale.isError, true);
+  assert.match(stale.content[0].text, /catalog changed before dispatch; nothing was sent/);
+  await until(() => notified);
+  assert.ok((await client.listTools({}, requestOptions)).tools.some((tool) => tool.name === profile.name));
+  assert.equal((await call(client, profile.name)).isError, false);
+});
+
+test("missing executable diagnostics never disclose its private path over MCP", async (t) => {
+  const marker = "private-path-audit-sentinel";
+  const { client } = await stdio({ CODEX_CONNECTORS_CODEX: `/nonexistent/${marker}` });
+  t.after(() => client.close());
+  await assert.rejects(client.listTools({}, requestOptions), (error) =>
+    /failed to start/.test(error.message) && !error.message.includes(marker));
+  const result = await call(client, "codex_connectors");
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /failed to start/);
+  assert.ok(!JSON.stringify(result).includes(marker));
+});

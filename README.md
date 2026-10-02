@@ -24,7 +24,8 @@ Add this to your harness's MCP configuration, replacing the absolute path:
       "command": "node",
       "args": ["/absolute/path/to/codex-connectors-mcp/dist/cli.js"],
       "env": {
-        "CODEX_CONNECTORS_WRITES": "ask"
+        "CODEX_CONNECTORS_WRITES": "ask",
+        "CODEX_CONNECTORS_ALLOW": "GitHub"
       }
     }
   }
@@ -34,12 +35,16 @@ Add this to your harness's MCP configuration, replacing the absolute path:
 If a desktop harness cannot find Node or Codex, use absolute executable paths
 for `command` and `CODEX_CONNECTORS_CODEX`. The process must run as the user
 whose Codex account has the apps connected. `CODEX_HOME` is inherited when set.
+The example limits access to GitHub; set `CODEX_CONNECTORS_ALLOW` to the apps
+you intend to share. Omitting it exposes all eligible connected apps.
 Configuration containers differ between harnesses; use their equivalent MCP
 server command/arguments/environment fields.
 
 Installing/configuring this bridge authorizes sharing app names, tool schemas,
 and tool results with that harness and its model provider. The bridge does not
-read credentials itself or save connector responses to disk.
+read credentials itself or save connector responses to disk. This does not
+guarantee that Codex, connected services, or the receiving harness retain no data.
+Read-only tools can return private data; write denial does not prevent reads.
 
 ## Tools
 
@@ -95,6 +100,10 @@ writes across all sessions of this server process, including after catalog
 refresh. Check the connected app before restarting. This guard is not durable
 across process restarts or separate server instances.
 
+After an app-server reconnection, a call using the old catalog is rejected before
+dispatch and the client is notified to rediscover tools. Validation and approval
+must use the new catalog; the bridge does not retry the rejected call.
+
 ## Settings
 
 | Variable | Default | Purpose |
@@ -106,7 +115,10 @@ across process restarts or separate server instances.
 | `CODEX_CONNECTORS_HTTP_TOKEN` | Unset | Required HTTP bearer token, at least 32 characters |
 
 CLI: `--transport stdio|http`, `--mode direct|compact`, `--port 8787`, `--help`.
-Diagnostics use stderr; stdio stdout contains MCP messages only.
+Diagnostics use stderr; stdio stdout contains MCP messages only. Raw child stderr
+is discarded, and upstream RPC errors are replaced with public diagnostics.
+Unexpected internal errors are not sent to clients. Connector tool results
+(including provider error results) are still forwarded as documented.
 
 ## Streamable HTTP
 
@@ -131,8 +143,7 @@ transport, and automatic public deployment are not included.
 
 ## Implementation
 
-Adapted from `pi-codex-connectors` revision
-`0e9709ea1e31a6e8b8b1435d8f084b516dec23a1`:
+Adapted from Wile's Pi connector bridge (see [NOTICE](NOTICE)):
 
 1. Spawn `codex app-server --listen stdio://`; initialize its experimental API.
 2. Read effective config and disable user-configured MCP servers in a temporary,
@@ -173,3 +184,8 @@ available. It prints counts/status, not profile contents. See
 
 The package contains built JavaScript, declarations, README, and provenance.
 It has no runtime dependency on the original checkout.
+
+## License
+
+[MIT](LICENSE). Copyright (c) 2026 Wile. Contact: info@wile.ai.
+See [NOTICE](NOTICE) for source attribution.
