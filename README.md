@@ -11,18 +11,16 @@ Requires Node.js 22.19+ and a Codex CLI with `app/installed` and
 
 ```sh
 codex login
-npm ci --ignore-scripts
-npm run build
 ```
 
-Add this to your harness's MCP configuration, replacing the absolute path:
+Add this to your harness's MCP configuration (no clone or build required):
 
 ```json
 {
   "mcpServers": {
     "codex-connectors": {
-      "command": "node",
-      "args": ["/absolute/path/to/codex-connectors-mcp/dist/cli.js"],
+      "command": "npx",
+      "args": ["-y", "codex-connectors-mcp@latest"],
       "env": {
         "CODEX_CONNECTORS_WRITES": "ask",
         "CODEX_CONNECTORS_ALLOW": "GitHub"
@@ -32,7 +30,29 @@ Add this to your harness's MCP configuration, replacing the absolute path:
 }
 ```
 
-If a desktop harness cannot find Node or Codex, use absolute executable paths
+`@latest` checks for the current stable version when the server starts; restart
+your harness to pick up updates. Pin `codex-connectors-mcp@0.1.0` when you need
+a fixed version. Prereleases are available through `@next`.
+
+For Codex, add this to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.codex-connectors]
+command = "npx"
+args = ["-y", "codex-connectors-mcp@latest"]
+startup_timeout_sec = 120
+tool_timeout_sec = 180
+
+[mcp_servers.codex-connectors.env]
+CODEX_CONNECTORS_WRITES = "ask"
+CODEX_CONNECTORS_ALLOW = "GitHub"
+```
+
+See the [Codex MCP configuration reference](https://developers.openai.com/codex/mcp/).
+Other local workflow runners can use the same command, arguments, and environment.
+They must support MCP stdio and have access to your authenticated Codex CLI.
+
+If a desktop harness cannot find npx or Codex, use absolute executable paths
 for `command` and `CODEX_CONNECTORS_CODEX`. The process must run as the user
 whose Codex account has the apps connected. `CODEX_HOME` is inherited when set.
 The example limits access to GitHub; set `CODEX_CONNECTORS_ALLOW` to the apps
@@ -126,7 +146,7 @@ For clients using an MCP URL rather than a subprocess:
 
 ```sh
 export CODEX_CONNECTORS_HTTP_TOKEN="$(openssl rand -hex 32)"
-node dist/cli.js --transport http --port 8787
+npx -y codex-connectors-mcp@latest --transport http --port 8787
 ```
 
 Configure the client with `http://127.0.0.1:8787/mcp` and
@@ -166,13 +186,21 @@ See the [official Codex app-server reference](https://learn.chatgpt.com/docs/app
 and [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk/tree/v1.x).
 The Codex interface is version-sensitive; a future CLI change may require an adapter update.
 
+## Development
+
+```sh
+npm ci --ignore-scripts
+npm run build
+node dist/cli.js --help
+```
+
 ## Verification
 
 ```sh
 npm run check
 npm test
 npm audit
-npm pack --dry-run
+npm run test:package
 ```
 
 Tests are live integration scenarios using the real MCP SDK client, bridge
@@ -182,7 +210,14 @@ suite expects GitHub and Instacart connected; Figma's profile is checked when
 available. It prints counts/status, not profile contents. See
 [integration/SCENARIOS.md](integration/SCENARIOS.md).
 
-The package contains built JavaScript, declarations, README, and provenance.
+`npm run test:package` installs the actual tarball into a temporary directory,
+checks its executable and MCP handshake/discovery without a Codex login, and
+checks that source files and credentials are excluded. CI runs this on Linux
+and macOS; live connector scenarios remain a separate authenticated check.
+
+For publishing setup and release instructions, see [RELEASING.md](RELEASING.md).
+
+The package contains built JavaScript, declarations, README, and license notices.
 It has no runtime dependency on the original checkout.
 
 ## License

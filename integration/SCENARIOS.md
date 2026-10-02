@@ -24,3 +24,8 @@
 These scenarios require the current Codex login and network access. They do not
 simulate a provider or exercise successful remote mutations. No profile payloads
 or account-specific schemas are saved in the repository.
+
+- Package distribution (no login): install the real npm tarball outside the
+  checkout with production dependencies only; launch the installed executable;
+  verify help, MCP initialization/version and compact discovery, and package
+  file allowlist. Run with `npm run test:package`.
