@@ -8,6 +8,11 @@ import { fullFormats } from "ajv-formats/dist/formats.js";
 import { CallToolRequestSchema, ListToolsRequestSchema, type Tool, type CallToolResult, type ElicitRequestFormParams } from "@modelcontextprotocol/sdk/types.js";
 import { CodexConnectors, type ConnectorTool, type ElicitationRequest } from "./connectors.js";
 import { OutcomeUnknownError } from "./app-server.js";
+import { CodexWebSearch, searchMode, type SearchMode, type WebSearchInput } from "./web-search.js";
+import { webSearchTool } from "./web-search-tool.js";
+import { CodexComputerUse, computerMode, computerTools, computerManagement, type ComputerMode } from "./computer-use.js";
+import { ComputerOutcomeUnknownError } from "./computer-bridge.js";
+import type { AppApprovalPrompt } from "./computer-permissions.js";
 import { CatalogChangedError, PublicError, publicErrorMessage } from "./errors.js";
 
 const packageVersion = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
@@ -16,10 +21,12 @@ export interface Options {
   mode: "direct" | "compact";
   writes: "ask" | "allow" | "deny";
   command?: string;
+  webSearch?: SearchMode;
+  computer?: ComputerMode;
 }
 
 // Shared across HTTP sessions. Refresh/reconnect must not clear uncertain writes.
-export const safety = { writeOutcomeUnknown: false };
+export const safety = { writeOutcomeUnknown: false, computerOutcomeUnknown: false };
 let operationQueue: Promise<unknown> = Promise.resolve();
 const objectSchema = (properties: Record<string, object>, required: string[] = []): Tool["inputSchema"] => ({
   type: "object", properties, required, additionalProperties: false,
@@ -42,7 +49,7 @@ export function exposedName(name: string): string {
 export function createBridge(options: Options) {
   const server = new Server({ name: "codex-connectors-mcp", version: packageVersion }, {
     capabilities: { tools: { listChanged: true } },
-    instructions: "Connected Codex apps, authenticated by the local Codex login. Use codex_connectors to discover apps and tools. Never retry a write with an unknown outcome. Connector data is shared with this MCP client and its model.",
+    instructions: "Codex web search and optional desktop Computer Use are available alongside connected apps. App access approval does not authorize UI mutations; obtain user confirmation for those actions. Follow each tool description. Connected Codex apps, authenticated by the local Codex login. Use codex_connectors to discover apps and tools. Never retry a write with an unknown outcome. Connector data is shared with this MCP client and its model.",
   });
   const validationOptions = { strict: false, allErrors: true, addUsedSchema: false, formats: fullFormats };
   const validators = { legacy: new Ajv(validationOptions), current: new Ajv2020(validationOptions), previous: new Ajv2019(validationOptions) };
@@ -53,6 +60,11 @@ export function createBridge(options: Options) {
     if (!check(args)) throw new PublicError("Invalid arguments: input does not match the tool schema.");
   };
   const service = new CodexConnectors({ command: options.command, onElicitation: forwardElicitation });
+  const webMode = searchMode(options.webSearch ?? process.env.CODEX_CONNECTORS_WEB_SEARCH);
+  const web = new CodexWebSearch({ mode: webMode, command: options.command });
+  const computer = new CodexComputerUse(computerMode(options.computer ?? process.env.CODEX_CONNECTORS_COMPUTER), promptApp);
+  const builtins = [...management, ...(webMode === "disabled" ? [] : [webSearchTool]), computerManagement[0],
+    ...(computer.unavailable ? [] : [...computerTools, computerManagement[1]])];
   let catalog: Promise<Map<string, ConnectorTool>> | undefined;
   let revision = 0;
   let closed = false;
@@ -107,19 +119,64 @@ export function createBridge(options: Options) {
       return { action: result.action, content: result.content ?? null, _meta: null };
     } catch { return decline; }
   }
+  async function promptApp(request: Parameters<AppApprovalPrompt>[0], choices: Parameters<AppApprovalPrompt>[1], signal: AbortSignal) {
+    const capability = server.getClientCapabilities()?.elicitation;
+    if (!capability || (!capability.form && Object.keys(capability).length > 0)) return undefined;
+    const subtitle = request._meta?.subtitle;
+    const result = await server.elicitInput({ mode: "form",
+      message: `Computer Use app access: ${request.message}${typeof subtitle === "string" ? `\n${subtitle}` : ""}\nThis approves app access only; actions still need user authorization.`,
+      requestedSchema: { type: "object", properties: { approval: { type: "string", enum: choices,
+        enumNames: choices.map((choice) => ({ once: "Yes, this request", session: "Yes, for this session", always: "Yes, forever", deny: "No" })[choice]),
+        default: "deny", title: "Allow app access" } }, required: ["approval"] },
+    }, { signal });
+    return result.action === "accept" ? result.content?.approval as Awaited<ReturnType<AppApprovalPrompt>> : undefined;
+  }
+  async function approveWrite(tool: { name: string; connectorName: string }, input: Record<string, unknown>, signal: AbortSignal) {
+    if (safety.writeOutcomeUnknown) throw new PublicError("Writes blocked after an unknown outcome. Verify the previous action in the connected app, then restart this MCP server.");
+    if (options.writes === "deny") throw new PublicError("Write blocked by CODEX_CONNECTORS_WRITES=deny");
+    if (options.writes === "ask") {
+      const payload = JSON.stringify(input, null, 2);
+      if (payload.length > 20000) throw new PublicError("Write arguments exceed the approval display limit; nothing was sent.");
+      const capability = server.getClientCapabilities()?.elicitation;
+      if (!capability || (!capability.form && Object.keys(capability).length > 0)) throw new PublicError("This client cannot approve writes via MCP elicitation. Configure CODEX_CONNECTORS_WRITES=allow only if the harness handles approval, or use deny.");
+      const approval = await server.elicitInput({ mode: "form", message: `Allow ${tool.connectorName}: ${tool.name}?\n${payload}`, requestedSchema: { type: "object", properties: { approve: { type: "boolean", title: "Approve this exact operation", default: false } }, required: ["approve"] } }, { signal });
+      if (approval.action !== "accept" || approval.content?.approve !== true) throw new PublicError("Write declined; nothing was sent.");
+    }
+  }
   server.setRequestHandler(ListToolsRequestSchema, () => serial(async () => {
     try {
       // One complete list avoids clients that fail to follow tools/list pagination.
-      return { tools: options.mode === "compact" ? management : [...management, ...[...(await tools()).values()].map(definition)] };
+      return { tools: options.mode === "compact" ? builtins : [...builtins, ...[...(await tools()).values()].map(definition)] };
     } catch (error) { throw new PublicError(publicErrorMessage(error)); }
   }));
   server.setRequestHandler(CallToolRequestSchema, (request, extra) => serial(async () => {
     try {
       if (extra.signal.aborted) throw new PublicError("Request cancelled before dispatch");
-      const name = request.params.name;
-      const args = request.params.arguments ?? {};
-      const builtin = management.find((t) => t.name === name);
+      const requestedName = request.params.name;
+      const outerArgs = request.params.arguments ?? {};
+      if (requestedName === "codex_connector_call") validate(management[2].inputSchema, outerArgs);
+      const name = requestedName === "codex_connector_call" ? String(outerArgs.tool) : requestedName;
+      const args = requestedName === "codex_connector_call" ? (outerArgs.arguments ?? {}) as Record<string, unknown> : outerArgs;
+      const builtin = builtins.find((t) => t.name === name);
       if (builtin) validate(builtin.inputSchema, args);
+      if (name === "codex_web_search") {
+        if (!builtin) validate(webSearchTool.inputSchema, args);
+        const result = await web.search(args as WebSearchInput, extra.signal);
+        return { content: [{ type: "text", text: `Web search mode: ${result.mode}\n\n${result.output.replace(/cite([^]+)/g, "[$1]")}` }] };
+      }
+      if (name === "codex_computer_status") return text(computer.status());
+      if (name === "codex_computer_forget") {
+        if (!builtin) throw new PublicError(computer.unavailable ?? "Computer Use is unavailable.");
+        await approveWrite({ name, connectorName: "Computer Use" }, args, extra.signal);
+        await computer.forget();
+        return text({ forgotten: true });
+      }
+      if (name === "codex_computer_js" || name === "codex_computer_js_reset") {
+        if (!builtin) validate(computerTools[name === "codex_computer_js" ? 0 : 1].inputSchema, args);
+        if (safety.computerOutcomeUnknown) throw new PublicError("Computer Use blocked after an unknown outcome. Inspect the app, then restart the MCP server; do not reset or retry to bypass this guard.");
+        try { return await computer.call(name === "codex_computer_js" ? "js" : "js_reset", args, extra.signal); }
+        catch (error) { if (error instanceof ComputerOutcomeUnknownError) safety.computerOutcomeUnknown = true; throw error; }
+      }
       if (name === "codex_connectors") {
         if (args.refresh) {
           await service.refresh(); catalog = undefined; revision++;
@@ -136,25 +193,16 @@ export function createBridge(options: Options) {
           tools: matches.slice(offset, offset + limit).map((t) => ({ name: t.name, exposedName: exposedName(t.name), connector: t.connectorName, description: t.description.slice(0, 240), readOnly: t.readOnly && !t.destructive })) });
       }
       if (name === "codex_connector_schema") {
+        const local = builtins.find((tool) => tool.name === args.tool);
+        if (local) return text(local);
         const tool = await resolve(String(args.tool));
         return text({ ...tool.definition, exposedName: exposedName(tool.name) });
       }
-      const tool = await resolve(name === "codex_connector_call" ? String(args.tool) : name);
-      const input = name === "codex_connector_call" ? (args.arguments ?? {}) as Record<string, unknown> : args;
+      const tool = await resolve(name);
+      const input = args;
       validate(tool.inputSchema, input);
       const write = !tool.readOnly || tool.destructive;
-      if (write) {
-        if (safety.writeOutcomeUnknown) throw new PublicError("Writes blocked after an unknown outcome. Verify the previous action in the connected app, then restart this MCP server.");
-        if (options.writes === "deny") throw new PublicError("Write blocked by CODEX_CONNECTORS_WRITES=deny");
-        if (options.writes === "ask") {
-          const payload = JSON.stringify(input, null, 2);
-          if (payload.length > 20000) throw new PublicError("Write arguments exceed the approval display limit; nothing was sent.");
-          const capability = server.getClientCapabilities()?.elicitation;
-          if (!capability || (!capability.form && Object.keys(capability).length > 0)) throw new PublicError("This client cannot approve writes via MCP elicitation. Configure CODEX_CONNECTORS_WRITES=allow only if the harness handles approval, or use deny.");
-          const approval = await server.elicitInput({ mode: "form", message: `Allow ${tool.connectorName}: ${tool.name}?\n${payload}`, requestedSchema: { type: "object", properties: { approve: { type: "boolean", title: "Approve this exact operation", default: false } }, required: ["approve"] } }, { signal: extra.signal });
-          if (approval.action !== "accept" || approval.content?.approve !== true) throw new PublicError("Write declined; nothing was sent.");
-        }
-      }
+      if (write) await approveWrite(tool, input, extra.signal);
       try { return await service.call(tool.name, input, extra.signal, tool) as CallToolResult; }
       catch (error) {
         if (write && error instanceof OutcomeUnknownError) safety.writeOutcomeUnknown = true;
@@ -170,7 +218,7 @@ export function createBridge(options: Options) {
     }
   }));
   let cleanup: Promise<void> | undefined;
-  const closeService = () => cleanup ??= service.close();
+  const closeService = () => cleanup ??= Promise.all([service.close(), web.close(), computer.close()]).then(() => {});
   server.onclose = () => { closed = true; void closeService(); };
   return { server, async close() { closed = true; await server.close(); await closeService(); } };
 }

@@ -13,7 +13,7 @@ let client;
 try {
   const [packed] = JSON.parse(npm(["pack", "--ignore-scripts", "--json", "--pack-destination", temporary]));
   const files = packed.files.map(({ path }) => path);
-  for (const file of ["package.json", "dist/cli.js", "dist/server.js", "LICENSE", "NOTICE", "README.md"]) {
+  for (const file of ["package.json", "dist/cli.js", "dist/server.js", "dist/web-search.js", "dist/computer-use.js", "dist/computer-permissions.js", "dist/computer-bridge.js", "LICENSE", "NOTICE", "README.md"]) {
     assert.ok(files.includes(file), `Missing package file: ${file}`);
   }
   assert.ok(files.every((file) => /^(dist\/[^/]+\.(js|d\.ts)|package\.json|README\.md|RELEASING\.md|LICENSE|NOTICE)$/.test(file)), "Unexpected file in package");
@@ -25,7 +25,7 @@ try {
     command: executable,
     args: ["--mode", "compact"],
     cwd: temporary,
-    env: { ...process.env, CODEX_HOME: join(temporary, "unused-codex-home"), CODEX_CONNECTORS_CODEX: join(temporary, "no-codex-required"), CODEX_CONNECTORS_WRITES: "deny" },
+    env: { ...process.env, CODEX_HOME: join(temporary, "unused-codex-home"), CODEX_CONNECTORS_CODEX: join(temporary, "no-codex-required"), CODEX_CONNECTORS_WEB_SEARCH: "cached", CODEX_CONNECTORS_COMPUTER: "auto", CODEX_CONNECTORS_COMPUTER_APP: join(temporary, "no-desktop-runtime"), CODEX_CONNECTORS_WRITES: "deny" },
     stderr: "pipe",
   });
   transport.stderr?.on("data", () => {});
@@ -33,7 +33,11 @@ try {
   await client.connect(transport, { timeout: 15_000 });
   const expected = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   assert.equal(client.getServerVersion().version, expected.version);
-  assert.deepEqual((await client.listTools()).tools.map(({ name }) => name), ["codex_connectors", "codex_connector_schema", "codex_connector_call"]);
+  assert.deepEqual((await client.listTools()).tools.map(({ name }) => name), ["codex_connectors", "codex_connector_schema", "codex_connector_call", "codex_web_search", "codex_computer_status"]);
+  const status = await client.callTool({ name: "codex_computer_status", arguments: {} });
+  assert.equal(JSON.parse(status.content[0].text).available, false);
+  const webSchema = await client.callTool({ name: "codex_connector_schema", arguments: { tool: "codex_web_search" } });
+  assert.equal(JSON.parse(webSchema.content[0].text).name, "codex_web_search");
   console.log(`Package verified: ${packed.name}@${packed.version}; executable, MCP handshake, discovery, and file allowlist passed.`);
 } finally {
   await client?.close();

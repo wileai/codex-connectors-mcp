@@ -5,6 +5,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { createBridge, type Options } from "./server.js";
+import { searchMode } from "./web-search.js";
+import { computerMode } from "./computer-use.js";
 import { PublicError, publicErrorMessage } from "./errors.js";
 
 async function main() {
@@ -13,9 +15,13 @@ async function main() {
     console.log(`codex-connectors-mcp [--transport stdio|http] [--port 8787] [--mode direct|compact]
 
 CODEX_CONNECTORS_CODEX    Codex executable (default: codex)
-CODEX_CONNECTORS_MODE     direct (all tools) or compact (3 discovery/call tools)
+CODEX_CONNECTORS_MODE     direct (all tools) or compact (discovery/call tools plus web/computer tools)
 CODEX_CONNECTORS_WRITES   ask (default), allow, deny
 CODEX_CONNECTORS_ALLOW    Optional comma-separated exact connector names/IDs
+CODEX_CONNECTORS_WEB_SEARCH  disabled, cached (default), indexed, live (maximum access)
+CODEX_CONNECTORS_WEB_SEARCH_MODEL  Retrieval routing model (default: gpt-5.4; no inference)
+CODEX_CONNECTORS_COMPUTER  auto (default), disabled
+CODEX_CONNECTORS_COMPUTER_APP  Desktop runtime path (default: /Applications/ChatGPT.app)
 CODEX_CONNECTORS_HTTP_TOKEN  Required bearer token for HTTP (at least 32 characters)
 
 Uses your existing Codex login. Connector data is shared with the MCP harness.
@@ -33,7 +39,7 @@ HTTP binds to 127.0.0.1 only. Endpoint: /mcp. No model turns are run.`);
   if (transport !== "stdio" && transport !== "http") throw new PublicError("transport must be stdio or http");
   if (mode !== "direct" && mode !== "compact") throw new PublicError("mode must be direct or compact");
   if (writes !== "ask" && writes !== "allow" && writes !== "deny") throw new PublicError("CODEX_CONNECTORS_WRITES must be ask, allow, or deny");
-  const options: Options = { mode, writes, command: process.env.CODEX_CONNECTORS_CODEX };
+  const options: Options = { mode, writes, command: process.env.CODEX_CONNECTORS_CODEX, webSearch: searchMode(process.env.CODEX_CONNECTORS_WEB_SEARCH), computer: computerMode(process.env.CODEX_CONNECTORS_COMPUTER) };
   let shutdown: () => Promise<void>;
   if (transport === "stdio") {
     const bridge = createBridge(options);

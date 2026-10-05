@@ -1,4 +1,9 @@
-The app-server transport and connector discovery implementation include code
-adapted from Wile's Pi connector bridge.
+The app-server transport, connector discovery, standalone web retrieval, and
+Computer Use runtime/approval implementations include code adapted from Wile's
+Pi connector bridge (MIT): https://github.com/wileai/pi-codex-connectors
+
+Web search: 746c55e. Remembered app approvals and runtime: 6b6be6f.
+Automatic Computer Use loading: 5bb14a0. Source inspected at 2048f50 (v0.3.1).
+Pi UI/commands are adapted to MCP form elicitation and server settings here.
 This project does not depend on Pi at runtime.
 See LICENSE for the MIT license terms.

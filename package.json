@@ -1,7 +1,7 @@
 {
   "name": "@wileai/codex-connectors-mcp",
   "version": "0.1.1",
-  "description": "Expose connected Codex apps to MCP harnesses without running a model",
+  "description": "Codex connected apps, web search, and macOS Computer Use for MCP harnesses without a model turn",
   "type": "module",
   "bin": {
     "codex-connectors-mcp": "dist/cli.js"
@@ -23,6 +23,7 @@
     "start": "node dist/cli.js",
     "test": "npm run build && node --test --test-concurrency=1 integration/*.test.mjs",
     "prepack": "npm run build",
+    "test:offline": "npm run build && node --test --test-concurrency=1 integration/web-search.test.mjs integration/computer-use.test.mjs integration/builtin-mcp.test.mjs",
     "test:package": "npm run build && node scripts/verify-package.mjs"
   },
   "dependencies": {

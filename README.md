@@ -1,7 +1,8 @@
 # @wileai/codex-connectors-mcp
 
-Use your connected Codex apps from any harness supporting **MCP stdio** or
-**Streamable HTTP**. Codex owns authentication; the harness chooses the model.
+Use your connected Codex apps, direct web search, and macOS Computer Use from
+any harness supporting **MCP stdio** or **Streamable HTTP**. Codex owns
+authentication; the harness chooses the model.
 No Codex model turn, API key, or Pi dependency is involved.
 
 Website: **https://wileai.github.io/codex-connectors-mcp/**
@@ -14,7 +15,7 @@ The npm package is now published under the Wile organization as
 ## Quick start
 
 Requires Node.js 22.19+ and a Codex CLI with `app/installed` and
-`mcpServer/tool/call`. Verified with Codex CLI **0.159.3**.
+`mcpServer/tool/call`. Verified with Codex CLI **0.160.0**.
 
 ```sh
 codex login
@@ -67,9 +68,15 @@ server command/arguments/environment fields.
 
 Installing/configuring this bridge authorizes sharing app names, tool schemas,
 and tool results with that harness and its model provider. The bridge does not
-read credentials itself or save connector responses to disk. This does not
-guarantee that Codex, connected services, or the receiving harness retain no data.
+read credential files or save connector/web responses to disk. Direct web retrieval
+requests a Codex access token from app-server, holds it in memory, and sends it
+only to the fixed OpenAI search endpoint. Tokens and opaque backend data never
+enter MCP results. Computer Use can save screenshots/session artifacts through
+the desktop runtime. This does not guarantee that Codex, connected services,
+or the receiving harness retain no data.
 Read-only tools can return private data; write denial does not prevent reads.
+The app allowlist controls connectors only. Web search and Computer Use have
+separate settings; disable them explicitly when sharing only connector access.
 
 ## Tools
 
@@ -78,7 +85,7 @@ Read-only tools can return private data; write denial does not prevent reads.
 have stable ASCII names capped at 64 characters, e.g.
 `github_get_profile_3b5eaf4306c5`. These names work in clients that reject dots.
 
-Three additional tools are available in either mode:
+These connector management tools are available in either mode:
 
 | Tool | Purpose |
 | --- | --- |
@@ -86,8 +93,9 @@ Three additional tools are available in either mode:
 | `codex_connector_schema` | Full original tool definition, plus its exposed name |
 | `codex_connector_call` | Call by original or exposed name with an `arguments` object |
 
-**Compact mode:** set `CODEX_CONNECTORS_MODE=compact` to expose only these three
-tools. All eligible connector tools remain callable through the dispatcher.
+**Compact mode:** set `CODEX_CONNECTORS_MODE=compact` to expose these three
+connector management tools plus enabled web/computer tools. All eligible
+connector tools remain callable through the dispatcher.
 Use this when a harness limits tool counts or hundreds of schemas cost too much
 context. Example workflow:
 
@@ -100,6 +108,71 @@ codex_connector_call({"tool":"github.get_profile","arguments":{}})
 Only apps reported as enabled and callable by Codex are exposed, not the public
 app marketplace or your separately configured MCP servers. This bridges tools;
 it does not install associated plugin skills into the receiving harness.
+
+## Web search
+
+`codex_web_search` is available in both modes by default. It supports up to four
+operations each in `search_query`, `open`, `find`, and `click`, with source URLs
+and result references. Indexed retrieval can return link IDs that the upstream
+click endpoint rejects on some pages; those errors are preserved without retrying
+or broadening access. Reuse references within the same MCP connection; closing
+it resets their scope. Connector catalog refresh does not reset web references.
+
+```text
+codex_web_search({"search_query":[{"q":"OpenAI Codex documentation"}],"allowed_domains":["developers.openai.com"]})
+codex_web_search({"open":[{"ref_id":"<reference returned by search>"}]})
+```
+
+`CODEX_CONNECTORS_WEB_SEARCH` sets maximum access: `disabled`, `cached` (default),
+`indexed`, or `live`. A tool's `mode` argument can narrow access but cannot broaden
+it. These map to the upstream `external_web_access` settings `false`, `"indexed"`,
+and `true`. Domain filters apply to hosted retrieval, not local networking or
+connector access. Web content is untrusted source material.
+
+Retrieval requires a ChatGPT Codex login. It uses Codex's standalone search
+endpoint with no `thread/start` or `turn/start`. The endpoint is version-sensitive
+and may be unavailable for an account; failures never fall back to inference or
+broader access. `CODEX_CONNECTORS_WEB_SEARCH_MODEL` selects its routing field
+(default `gpt-5.4`), not a model turn. Requests time out after 60 seconds; responses
+are capped at 2 MiB without truncating or saving a full response.
+
+## Computer Use
+
+On macOS, the bridge automatically exposes `codex_computer_js` and
+`codex_computer_js_reset` when ChatGPT's bundled Computer Use runtime is installed.
+Set `CODEX_CONNECTORS_COMPUTER_APP` for a non-default installation, or
+`CODEX_CONNECTORS_COMPUTER=disabled` to disable it. `codex_computer_status` is always
+available and explains missing runtime/platform support without starting it.
+Missing Computer Use does not prevent connector or web-search startup.
+
+```text
+codex_computer_js({"code":"var sky = (await import('@oai/sky')).sky; nodeRepl.write(JSON.stringify(await sky.list_apps()));","title":"List available apps"})
+```
+
+JavaScript state persists per MCP connection. Follow the tool's Sky instructions
+and runtime guidance; read fresh app state after each action. Text and images
+are forwarded through MCP. `js_reset` clears JavaScript state, not app approvals.
+
+Native app access requests are forwarded as MCP form elicitation, offering
+**this request**, **this session**, **forever**, or **No**. Session/forever choices
+are offered only when the native policy allows them. Saved grants live in
+`$CODEX_HOME/codex-connectors-mcp/computer-use-approvals.json` (default under
+`~/.codex`), written atomically with owner-only permissions. Clients without
+elicitation decline new app access; permitted saved grants can be reused.
+`codex_computer_forget` closes this connection's runtime and clears its session
+and saved grants, subject to `CODEX_CONNECTORS_WRITES`.
+
+Computer Use has separate native app approvals: `CODEX_CONNECTORS_WRITES`
+governs connector calls and forgetting grants, not arbitrary Computer Use
+JavaScript. The receiving harness must authorize UI actions. An app grant does
+not authorize sending messages, submitting forms, deleting data, or changing
+settings. Native restrictions remain enforced. Declined access must not be
+retried through another app, JavaScript reset, or alternative automation.
+
+Cancellation, timeout, or runtime disconnection after a Computer Use call is
+dispatched can leave an unknown outcome. Further JavaScript/reset calls are
+blocked across this process's HTTP sessions. Inspect the app before restarting;
+reset, forgetting grants, and connector refresh cannot clear that guard.
 
 ## Writes
 
@@ -137,6 +210,10 @@ must use the new catalog; the bridge does not retry the rejected call.
 | `CODEX_CONNECTORS_MODE` | `direct` | `direct` or `compact` |
 | `CODEX_CONNECTORS_WRITES` | `ask` | `ask`, `allow`, or `deny` |
 | `CODEX_CONNECTORS_ALLOW` | All eligible apps | Comma-separated exact connector names or IDs, case-insensitive; an explicitly empty value exposes none |
+| `CODEX_CONNECTORS_WEB_SEARCH` | `cached` | Maximum retrieval access: `disabled`, `cached`, `indexed`, `live` |
+| `CODEX_CONNECTORS_WEB_SEARCH_MODEL` | `gpt-5.4` | Standalone retrieval routing field; no inference |
+| `CODEX_CONNECTORS_COMPUTER` | `auto` | Automatically expose installed macOS runtime; `disabled` opts out |
+| `CODEX_CONNECTORS_COMPUTER_APP` | `/Applications/ChatGPT.app` | Desktop runtime installation path |
 | `CODEX_CONNECTORS_HTTP_TOKEN` | Unset | Required HTTP bearer token, at least 32 characters |
 
 CLI: `--transport stdio|http`, `--mode direct|compact`, `--port 8787`, `--help`.
@@ -173,6 +250,8 @@ Adapted from Wile's Pi connector bridge (see [NOTICE](NOTICE)):
 1. Spawn `codex app-server --listen stdio://`; initialize its experimental API.
 2. Read effective config and disable user-configured MCP servers in a temporary,
    ephemeral thread. Enable apps; disable model-adjacent features. No `turn/start`.
+   Web retrieval uses a separate auth-only app-server; Computer Use uses the local
+   desktop runtime instead of the connector thread.
 3. Read `app/installed`, retaining enabled/callable apps and the optional allowlist.
 4. Page `mcpServerStatus/list`; retain `codex_apps` tools and join them to installed
    apps using `_meta.connector_id`.
@@ -203,14 +282,21 @@ node dist/cli.js --help
 
 ```sh
 npm run check
+npm run test:offline
 npm test
 npm audit
 npm run test:package
 ```
 
-Tests are live integration scenarios using the real MCP SDK client, bridge
+`npm run test:offline` checks synthetic web authentication/HTTP, mode limits,
+privacy, cancellation, native approval policy, and MCP tool routing without a
+login or network. CI runs these checks on Linux and macOS.
+
+`npm test` additionally runs live integration scenarios using the real MCP SDK client, bridge
 process, Codex app-server, and current login. They read profiles and exercise
-denial paths; they do not perform connector writes or run a model. The checked-in
+denial paths, real retrieval in all three modes, and (when installed) a harmless
+Calculator accessibility/screenshot read, persistent JavaScript, and reset.
+They do not perform connector writes, clicks, typing, or run a model. The checked-in
 suite expects GitHub and Instacart connected; Figma's profile is checked when
 available. It prints counts/status, not profile contents. See
 [integration/SCENARIOS.md](integration/SCENARIOS.md).
