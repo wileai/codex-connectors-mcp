@@ -162,9 +162,13 @@ elicitation decline new app access; permitted saved grants can be reused.
 `codex_computer_forget` closes this connection's runtime and clears its session
 and saved grants, subject to `CODEX_CONNECTORS_WRITES`.
 
-Computer Use has separate native app approvals: `CODEX_CONNECTORS_WRITES`
-governs connector calls and forgetting grants, not arbitrary Computer Use
-JavaScript. The receiving harness must authorize UI actions. An app grant does
+Computer Use JavaScript runs with the current user's privileges, including file,
+process, and network access; native app prompts do not sandbox JavaScript.
+`CODEX_CONNECTORS_WRITES` governs each JavaScript/reset call and forgetting grants:
+`deny` blocks calls, `ask` requires approval of the exact tool and arguments
+(including code and title), and `allow` delegates authorization to the harness.
+Native app access still requires its separate approval. The receiving harness
+must authorize UI actions. An app grant does
 not authorize sending messages, submitting forms, deleting data, or changing
 settings. Native restrictions remain enforced. Declined access must not be
 retried through another app, JavaScript reset, or alternative automation.
@@ -180,7 +184,7 @@ reset, forgetting grants, and connector refresh cannot clear that guard.
 | --- | --- |
 | `ask` (default) | Request approval through MCP form elicitation, displaying the exact tool and arguments. Clients without elicitation cannot write. |
 | `allow` | Let the receiving harness handle authorization; the bridge adds no write confirmation. |
-| `deny` | Reject tools not marked read-only, and all tools marked destructive. |
+| `deny` | Reject connector tools not marked read-only, all destructive connector tools, and Computer Use JavaScript/reset/forget calls. |
 
 For a harness that already confirms MCP calls but does not support elicitation,
 set `CODEX_CONNECTORS_WRITES=allow`. That trusts the harness to approve actions.

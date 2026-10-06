@@ -60,10 +60,11 @@ const probe = new CodexComputerUse("auto");
 const available = probe.status().available;
 await probe.close();
 test("live MCP Computer Use: automatic discovery, persistent JS, app read, screenshot forwarding and reset", { skip: !available, timeout: 180_000 }, async (t) => {
-  const client = await stdio({ CODEX_CONNECTORS_WEB_SEARCH: "disabled", CODEX_CONNECTORS_COMPUTER: "auto" }, { elicitation: { form: {} } });
+  const client = await stdio({ CODEX_CONNECTORS_WEB_SEARCH: "disabled", CODEX_CONNECTORS_COMPUTER: "auto", CODEX_CONNECTORS_WRITES: "ask" }, { elicitation: { form: {} } });
   t.after(() => client.close());
   let prompts = 0;
   client.setRequestHandler(ElicitRequestSchema, async (request) => {
+    if (request.params.requestedSchema.properties.approve) return { action: "accept", content: { approve: true } };
     prompts++;
     assert.match(request.params.message, /Computer Use app access/);
     assert.ok(request.params.requestedSchema.properties.approval.enum.includes("once"));
@@ -90,7 +91,7 @@ test("live MCP Computer Use: automatic discovery, persistent JS, app read, scree
 test("live HTTP builtins: independent web references and desktop JavaScript state, DELETE cleanup", { timeout: 180_000 }, async (t) => {
   const token = randomBytes(32).toString("hex");
   const child = spawn(process.execPath, [resolve("dist/cli.js"), "--transport", "http", "--port", "0", "--mode", "compact"], {
-    env: { ...process.env, CODEX_CONNECTORS_HTTP_TOKEN: token, CODEX_CONNECTORS_WEB_SEARCH: "cached", CODEX_CONNECTORS_COMPUTER: "auto", CODEX_CONNECTORS_WRITES: "deny" }, stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, CODEX_CONNECTORS_HTTP_TOKEN: token, CODEX_CONNECTORS_WEB_SEARCH: "cached", CODEX_CONNECTORS_COMPUTER: "auto", CODEX_CONNECTORS_WRITES: "allow" }, stdio: ["ignore", "pipe", "pipe"],
   });
   t.after(async () => { if (child.exitCode === null) { child.kill("SIGTERM"); await once(child, "exit"); } });
   const url = await new Promise((resolve, reject) => {

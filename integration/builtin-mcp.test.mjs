@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ElicitRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { CodexComputerUse } from "../dist/computer-use.js";
 import { createBridge, safety } from "../dist/server.js";
 
 async function connect(options, capabilities = {}) {
@@ -67,7 +68,8 @@ test("MCP computer: native app approvals, persisted grants, content preservation
   process.env.CODEX_CONNECTORS_COMPUTER_APP = temporary; process.env.CODEX_HOME = join(temporary, "codex-home");
   let bridge, next;
   try {
-    bridge = await connect({ computer: "auto", webSearch: "disabled" }, { elicitation: { form: {} } });
+    await verifyComputerWritePolicy();
+    bridge = await connect({ computer: "auto", webSearch: "disabled", writes: "allow" }, { elicitation: { form: {} } });
     let prompts = 0, choice = "always";
     bridge.client.setRequestHandler(ElicitRequestSchema, async (request) => {
       prompts++; assert.ok(request.params.requestedSchema.properties.approval.enum.includes("always"));
@@ -96,3 +98,40 @@ test("MCP computer: native app approvals, persisted grants, content preservation
     rmSync(temporary, { recursive: true, force: true });
   }
 });
+
+
+async function verifyComputerWritePolicy() {
+  const dispatch = mock.method(CodexComputerUse.prototype, "call", async () => ({ content: [{ type: "text", text: "executed" }] }));
+  try {
+    for (const writes of ["deny", "ask", "allow"]) {
+      for (const elicitation of [false, true]) {
+        const bridge = await connect({ computer: "auto", writes }, elicitation ? { elicitation: { form: {} } } : {});
+        let prompts = 0, approve = false;
+        if (elicitation) bridge.client.setRequestHandler(ElicitRequestSchema, async (request) => {
+          prompts++;
+          assert.match(request.params.message, /Computer Use: codex_computer_js/);
+          if (request.params.message.includes('"code"')) {
+            assert.ok(request.params.message.includes('"title": "Policy probe"'));
+            assert.ok(request.params.message.includes('"code": "nodeRepl.write(42)"'));
+          }
+          return { action: "accept", content: { approve } };
+        });
+        try {
+          for (const name of ["codex_computer_js", "codex_computer_js_reset"]) {
+            for (const route of [name, "codex_connector_call"]) {
+              const args = name.endsWith("_js") ? { code: "nodeRepl.write(42)", title: "Policy probe" } : {};
+              for (approve of [false, true]) {
+                const before = dispatch.mock.callCount();
+                const result = await call(bridge.client, route, route === name ? args : { tool: name, arguments: args });
+                const allowed = writes === "allow" || (writes === "ask" && elicitation && approve);
+                assert.equal(!result.isError, allowed);
+                assert.equal(dispatch.mock.callCount() - before, allowed ? 1 : 0);
+              }
+            }
+          }
+          assert.equal(prompts, writes === "ask" && elicitation ? 8 : 0);
+        } finally { await bridge.close(); }
+      }
+    }
+  } finally { mock.restoreAll(); }
+}

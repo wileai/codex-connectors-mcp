@@ -432,7 +432,7 @@ td:first-child code { color: var(--text); }
   <section id="writes">
     <div class="label">04 · Writes</div>
     <h2>Reads flow. <em>Writes</em> ask first.</h2>
-    <div class="prose"><p>Connector calls not marked read-only go through a write policy. Computer Use has separate native app approvals; your harness must authorize UI actions. By default you approve each write through MCP form elicitation, which shows the exact tool and arguments.</p></div>
+    <div class="prose"><p>Connector calls not marked read-only and Computer Use JavaScript/reset calls go through the write policy. Computer Use JavaScript runs with your user privileges; native app approvals do not sandbox it. Native app access also requires separate approval; your harness must authorize UI actions. By default you approve each write through MCP form elicitation, which shows the exact tool and arguments.</p></div>
     <div class="cards">
       <div class="card def"><div class="tag">ask · default</div><h3>Approve each one</h3><p>The bridge shows the tool and its arguments in an elicitation form. Clients that can't elicit can't write.</p></div>
       <div class="card"><div class="tag">allow</div><h3>Trust the harness</h3><p>For harnesses that already confirm MCP calls. The bridge adds no extra prompt.</p></div>

@@ -174,6 +174,8 @@ export function createBridge(options: Options) {
       if (name === "codex_computer_js" || name === "codex_computer_js_reset") {
         if (!builtin) validate(computerTools[name === "codex_computer_js" ? 0 : 1].inputSchema, args);
         if (safety.computerOutcomeUnknown) throw new PublicError("Computer Use blocked after an unknown outcome. Inspect the app, then restart the MCP server; do not reset or retry to bypass this guard.");
+        if (computer.unavailable) throw new PublicError(computer.unavailable);
+        await approveWrite({ name, connectorName: "Computer Use" }, args, extra.signal);
         try { return await computer.call(name === "codex_computer_js" ? "js" : "js_reset", args, extra.signal); }
         catch (error) { if (error instanceof ComputerOutcomeUnknownError) safety.computerOutcomeUnknown = true; throw error; }
       }
