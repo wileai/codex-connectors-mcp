@@ -291,7 +291,7 @@ td:first-child code { color: var(--text); }
       <rect x="50" y="10" width="20" height="30" fill="#6a9fcc"/>
     </svg>
     <h1>Your Codex plugins,<br>in <em>any</em> harness</h1>
-    <p class="lede">An MCP bridge for the apps you've connected in Codex. Codex keeps the logins. Your harness picks the model. No model turn, no API key.</p>
+    <p class="lede">An MCP bridge for connected Codex apps, direct web search, and macOS Computer Use. Codex keeps the logins. Your harness picks the model. No model turn, no API key.</p>
 
     <div class="install panel">
       <div class="tabs" role="tablist" aria-label="Install instructions">
@@ -400,13 +400,13 @@ td:first-child code { color: var(--text); }
           <p>Every enabled connector tool appears in <code>tools/list</code> with its full input schema and provider annotations, under stable ASCII names of 64 characters or fewer.</p>
 <pre><span class="k">github_get_profile_3b5eaf4306c5</span>
 <span class="c">&lt;app&gt;_&lt;tool&gt;_&lt;hash&gt;  for every other tool</span>
-<span class="c">… plus the three dispatcher tools</span></pre>
+<span class="c">… plus dispatcher, web, and computer tools</span></pre>
         </div>
       </div>
       <div class="panel">
         <div class="panel-bar"><span class="dot"></span>Compact mode · CODEX_CONNECTORS_MODE=compact</div>
         <div class="body">
-          <p>Only three tools. Everything stays callable through the dispatcher, which is handy when a harness caps tool counts or hundreds of schemas would crowd the context.</p>
+          <p>Three connector management tools, plus enabled web and computer tools. App tools stay callable through the dispatcher, which is handy when a harness caps tool counts or hundreds of schemas would crowd the context.</p>
 <pre><span class="k">codex_connectors</span>({<span class="s">"connector"</span>:<span class="s">"GitHub"</span>,<span class="s">"query"</span>:<span class="s">"profile"</span>})
 <span class="k">codex_connector_schema</span>({<span class="s">"tool"</span>:<span class="s">"github.get_profile"</span>})
 <span class="k">codex_connector_call</span>({<span class="s">"tool"</span>:<span class="s">"github.get_profile"</span>,
@@ -421,6 +421,9 @@ td:first-child code { color: var(--text); }
           <tr><td><code>codex_connectors</code></td><td>List apps; filter tools by <code>connector</code> and/or <code>query</code>; paginate with <code>offset</code>/<code>limit</code>; reload with <code>refresh: true</code>.</td></tr>
           <tr><td><code>codex_connector_schema</code></td><td>The full original tool definition, plus its exposed name.</td></tr>
           <tr><td><code>codex_connector_call</code></td><td>Call by original or exposed name with an <code>arguments</code> object.</td></tr>
+          <tr><td><code>codex_web_search</code></td><td>Search, open, find, and follow result links. Cached by default; maximum access is configured by the user.</td></tr>
+          <tr><td><code>codex_computer_js</code>, <code>codex_computer_js_reset</code></td><td>Persistent desktop JavaScript and reset, automatically available with the macOS runtime. App approvals use MCP forms.</td></tr>
+          <tr><td><code>codex_computer_status</code>, <code>codex_computer_forget</code></td><td>Runtime availability and grant revocation. Forgetting grants follows the write policy.</td></tr>
         </tbody>
       </table>
     </div>
@@ -429,7 +432,7 @@ td:first-child code { color: var(--text); }
   <section id="writes">
     <div class="label">04 · Writes</div>
     <h2>Reads flow. <em>Writes</em> ask first.</h2>
-    <div class="prose"><p>Anything not marked read-only goes through a write policy. By default you approve each write through MCP form elicitation, which shows the exact tool and arguments.</p></div>
+    <div class="prose"><p>Connector calls not marked read-only and Computer Use JavaScript/reset calls go through the write policy. Computer Use JavaScript runs with your user privileges; native app approvals do not sandbox it. Native app access also requires separate approval; your harness must authorize UI actions. By default you approve each write through MCP form elicitation, which shows the exact tool and arguments.</p></div>
     <div class="cards">
       <div class="card def"><div class="tag">ask · default</div><h3>Approve each one</h3><p>The bridge shows the tool and its arguments in an elicitation form. Clients that can't elicit can't write.</p></div>
       <div class="card"><div class="tag">allow</div><h3>Trust the harness</h3><p>For harnesses that already confirm MCP calls. The bridge adds no extra prompt.</p></div>
@@ -448,7 +451,11 @@ td:first-child code { color: var(--text); }
           <tr><td><code>CODEX_CONNECTORS_CODEX</code></td><td><code>codex</code></td><td>Path to the Codex executable.</td></tr>
           <tr><td><code>CODEX_CONNECTORS_MODE</code></td><td><code>direct</code></td><td><code>direct</code> or <code>compact</code>.</td></tr>
           <tr><td><code>CODEX_CONNECTORS_WRITES</code></td><td><code>ask</code></td><td><code>ask</code>, <code>allow</code> or <code>deny</code>.</td></tr>
-          <tr><td><code>CODEX_CONNECTORS_ALLOW</code></td><td>All eligible apps</td><td>Comma-separated connector names or IDs, case-insensitive. An explicitly empty value exposes nothing.</td></tr>
+          <tr><td><code>CODEX_CONNECTORS_WEB_SEARCH</code></td><td><code>cached</code></td><td>Maximum access: disabled, cached, indexed, live.</td></tr>
+          <tr><td><code>CODEX_CONNECTORS_WEB_SEARCH_MODEL</code></td><td><code>gpt-5.4</code></td><td>Standalone retrieval routing field; no model turn.</td></tr>
+          <tr><td><code>CODEX_CONNECTORS_COMPUTER</code></td><td><code>auto</code></td><td>Automatic macOS runtime discovery; disabled opts out.</td></tr>
+          <tr><td><code>CODEX_CONNECTORS_COMPUTER_APP</code></td><td><code>/Applications/ChatGPT.app</code></td><td>Desktop runtime installation path.</td></tr>
+          <tr><td><code>CODEX_CONNECTORS_ALLOW</code></td><td>All eligible apps</td><td>Comma-separated connector names or IDs, case-insensitive. An explicitly empty value exposes no connectors. Web and computer access are configured separately.</td></tr>
           <tr><td><code>CODEX_CONNECTORS_HTTP_TOKEN</code></td><td>Unset</td><td>Bearer token for HTTP transport, at least 32 characters.</td></tr>
         </tbody>
       </table>
@@ -478,13 +485,13 @@ td:first-child code { color: var(--text); }
     <h2>What we didn't build</h2>
     <div class="nots">
       <div><h3>No model</h3><p>The bridge never calls <code>turn/start</code>. Your harness's model does the thinking; Codex just serves the apps.</p></div>
-      <div><h3>No API keys</h3><p>Authentication stays with your <code>codex login</code>. The bridge doesn't read credentials itself.</p></div>
-      <div><h3>No disk cache</h3><p>Connector responses are forwarded, never written to disk, and never truncated.</p></div>
+      <div><h3>No API keys</h3><p>Authentication stays with your <code>codex login</code>. The bridge does not read credential files. Standalone web retrieval uses an access token from app-server in memory, sent only to OpenAI.</p></div>
+      <div><h3>No disk cache</h3><p>Connector/web responses are forwarded without a disk cache. The desktop runtime may save screenshots/session artifacts.</p></div>
       <div><h3>No auto-retry</h3><p>A write with an unknown outcome is never retried, and it blocks further writes until you've checked.</p></div>
       <div><h3>No hosted multi-user</h3><p>It's a local, single-account bridge. Cloud-only harnesses need their own secured route to it.</p></div>
       <div><h3>No skill install</h3><p>It bridges a plugin's app tools. Skills bundled with a Codex plugin stay in Codex.</p></div>
     </div>
-    <p class="fine">Installing the bridge means sharing app names, tool schemas and tool results with your harness and its model provider. Read-only tools can still return private data, so use <code>CODEX_CONNECTORS_ALLOW</code> to share only the apps you intend to.</p>
+    <p class="fine">Installing the bridge means sharing app names, tool schemas and tool results with your harness and its model provider. Read-only tools can still return private data, so use <code>CODEX_CONNECTORS_ALLOW</code> to share only the apps you intend to. This allowlist does not restrict web search or Computer Use; configure those separately.</p>
   </section>
 
   <footer class="foot">

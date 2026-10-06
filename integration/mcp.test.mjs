@@ -23,7 +23,7 @@ function children(pid) {
   return rows.trim().split("\n").map((r) => r.trim().split(/\s+/).map(Number)).filter(([, parent]) => parent === pid).map(([child]) => child);
 }
 async function stdio(env = {}, capabilities = {}) {
-  const transport = new StdioClientTransport({ command: process.execPath, args: [cli], env: { ...process.env, CODEX_CONNECTORS_WRITES: "deny", ...env }, stderr: "pipe" });
+  const transport = new StdioClientTransport({ command: process.execPath, args: [cli], env: { ...process.env, CODEX_CONNECTORS_WRITES: "deny", CODEX_CONNECTORS_WEB_SEARCH: "disabled", CODEX_CONNECTORS_COMPUTER: "disabled", ...env }, stderr: "pipe" });
   transport.stderr.on("data", () => {});
   const client = new Client({ name: "live-mcp-scenario", version: "1" }, { capabilities });
   try { await client.connect(transport); return { client, transport }; }
@@ -36,10 +36,10 @@ test("stdio direct: complete discovery, real read, validation, write denial, ref
   const listed = await client.listTools({}, requestOptions);
   const catalog = parse(await call(client, "codex_connectors"));
   assert.ok(catalog.connectors.length > 0);
-  assert.equal(listed.tools.length, catalog.connectors.reduce((n, c) => n + c.toolCount, 0) + 3);
+  assert.equal(listed.tools.length, catalog.connectors.reduce((n, c) => n + c.toolCount, 0) + 4);
   assert.equal(new Set(listed.tools.map((t) => t.name)).size, listed.tools.length);
   assert.ok(listed.tools.every((t) => /^[a-zA-Z0-9_-]{1,64}$/.test(t.name)));
-  t.diagnostic(`${catalog.connectors.length} connected apps; ${listed.tools.length - 3} connector tools`);
+  t.diagnostic(`${catalog.connectors.length} connected apps; ${listed.tools.length - 4} connector tools`);
   const profile = listed.tools.find((t) => t.name.startsWith("github_get_profile_"));
   assert.ok(profile, "Live scenario requires GitHub connected");
   const schema = parse(await call(client, "codex_connector_schema", { tool: profile.name }));
@@ -78,10 +78,10 @@ test("stdio direct: complete discovery, real read, validation, write denial, ref
   await until(() => !running(parent) && remaining.every((pid) => !running(pid)));
 });
 
-test("compact: three tools, pagination, allowlist, read, and unavailable write approval", { timeout: 240_000 }, async (t) => {
+test("compact: management tools, pagination, allowlist, read, and unavailable write approval", { timeout: 240_000 }, async (t) => {
   const { client } = await stdio({ CODEX_CONNECTORS_MODE: "compact", CODEX_CONNECTORS_WRITES: "ask", CODEX_CONNECTORS_ALLOW: "GitHub,Instacart" });
   t.after(() => client.close());
-  assert.equal((await client.listTools()).tools.length, 3);
+  assert.equal((await client.listTools()).tools.length, 4);
   const catalog = parse(await call(client, "codex_connectors"));
   assert.ok(catalog.connectors.every((c) => ["GitHub", "Instacart"].includes(c.name)));
   const first = parse(await call(client, "codex_connectors", { connector: "GitHub", limit: 1 }));
@@ -114,7 +114,7 @@ test("ask: write approval travels over MCP and declining prevents dispatch", { t
 test("empty allowlist exposes no connectors and cannot call excluded tools", { timeout: 180_000 }, async (t) => {
   const { client } = await stdio({ CODEX_CONNECTORS_ALLOW: "" });
   t.after(() => client.close());
-  assert.equal((await client.listTools({}, requestOptions)).tools.length, 3);
+  assert.equal((await client.listTools({}, requestOptions)).tools.length, 4);
   assert.deepEqual(parse(await call(client, "codex_connectors")).connectors, []);
   assert.equal((await call(client, "codex_connector_call", { tool: "github.get_profile" })).isError, true);
 });
@@ -122,7 +122,7 @@ test("empty allowlist exposes no connectors and cannot call excluded tools", { t
 test("HTTP: authentication, origin checks, independent sessions, real read, DELETE and shutdown", { timeout: 240_000 }, async (t) => {
   const token = randomBytes(32).toString("hex");
   const child = spawn(process.execPath, [cli, "--transport", "http", "--port", "0", "--mode", "compact"], {
-    env: { ...process.env, CODEX_CONNECTORS_HTTP_TOKEN: token, CODEX_CONNECTORS_WRITES: "deny", CODEX_CONNECTORS_ALLOW: "GitHub" }, stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, CODEX_CONNECTORS_WEB_SEARCH: "disabled", CODEX_CONNECTORS_COMPUTER: "disabled", CODEX_CONNECTORS_HTTP_TOKEN: token, CODEX_CONNECTORS_WRITES: "deny", CODEX_CONNECTORS_ALLOW: "GitHub" }, stdio: ["ignore", "pipe", "pipe"],
   });
   t.after(async () => { if (child.exitCode === null) { child.kill("SIGTERM"); await once(child, "exit"); } });
   const url = await new Promise((resolve, reject) => {
@@ -142,7 +142,7 @@ test("HTTP: authentication, origin checks, independent sessions, real read, DELE
   }
   assert.notEqual(clients[0].transport.sessionId, clients[1].transport.sessionId);
   for (const { client } of clients) {
-    assert.equal((await client.listTools()).tools.length, 3);
+    assert.equal((await client.listTools()).tools.length, 4);
     assert.ok(!(await call(client, "codex_connector_call", { tool: "github.get_profile" })).isError);
   }
   const appPids = children(child.pid);

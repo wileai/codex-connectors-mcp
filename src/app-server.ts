@@ -32,6 +32,7 @@ export interface AppServerOptions {
 	env?: NodeJS.ProcessEnv;
 	cwd?: string;
 	onServerRequest?: ServerRequestHandler;
+	signal?: AbortSignal;
 }
 
 export interface RequestOptions {
@@ -63,6 +64,7 @@ export class AppServerClient {
 	}
 
 	static async start(options: AppServerOptions): Promise<AppServerClient> {
+		if (options.signal?.aborted) throw new PublicError("Codex app-server startup was aborted");
 		const child = spawn(options.command, ["app-server", "--listen", "stdio://"], {
 			cwd: options.cwd,
 			env: options.env ?? process.env,
@@ -74,7 +76,7 @@ export class AppServerClient {
 			await client.request("initialize", {
 				clientInfo: { name: "codex_connectors_mcp", title: "Codex Connectors MCP", version: "0.1.0" },
 				capabilities: { experimentalApi: true },
-			});
+			}, { signal: options.signal });
 			client.notify("initialized", {});
 			return client;
 		} catch (error) {
